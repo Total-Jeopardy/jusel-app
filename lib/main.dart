@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jusel_app/features/auth/view/login_screen.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/router/router.dart';
+import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/firebase_options.dart';
 
 void main() async {
@@ -12,14 +14,27 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(ProviderScope(child: const MainApp())); // App starts AFTER Firebase
+  runApp(const ProviderScope(child: MainApp())); // App starts AFTER Firebase
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends ConsumerWidget {
   const MainApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, home: LoginScreen());
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(goRouterProvider);
+    final themeState = ref.watch(themeProvider);
+
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      routerConfig: router,
+      theme: juselLightTheme,
+      darkTheme: juselDarkTheme,
+      themeMode: themeState.mode == AppThemeMode.system
+          ? ThemeMode.system
+          : (themeState.mode == AppThemeMode.dark
+                ? ThemeMode.dark
+                : ThemeMode.light),
+    );
   }
 }
