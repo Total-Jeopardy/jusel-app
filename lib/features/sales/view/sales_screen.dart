@@ -7,6 +7,7 @@ import 'package:jusel_app/features/sales/models/cart_item.dart';
 import 'package:jusel_app/features/sales/providers/cart_provider.dart';
 import 'package:jusel_app/features/sales/view/cart_view.dart';
 import 'package:jusel_app/features/sales/view/product_selection_modal.dart';
+import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -145,7 +146,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           onPressed: () {
             final cartNotifier = ref.read(cartProvider.notifier);
             cartNotifier.clearCart();
-            Navigator.pop(context);
+            Navigator.of(context).maybePop();
           },
         ),
         title: const Text(
@@ -158,7 +159,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             onPressed: () {
               final cartNotifier = ref.read(cartProvider.notifier);
               cartNotifier.clearCart();
-              Navigator.pop(context);
+              Navigator.of(context).maybePop();
             },
             child: const Text(
               'Cancel Sale',
@@ -287,7 +288,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                       final product = _filteredProducts[index];
                       return _ProductCard(
                         product: product,
-                        onTap: () => _openProductModal(product),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ProductDetailScreen(product: product),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

@@ -12,9 +12,6 @@ import 'package:jusel_app/features/dashboard/view/boss_dashboard.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authViewModelProvider);
-  final initialUserExistsAsync = ref.watch(initialUserExistsProvider);
-  final initialUserExists =
-      initialUserExistsAsync.when(data: (v) => v, loading: () => true, error: (_, __) => true);
   final refreshListenable =
       GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges());
 
@@ -26,13 +23,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final loggingIn = state.matchedLocation == '/login';
       final firstSetup = state.matchedLocation == '/first-setup';
 
-      // If no user exists yet, force first-setup
-      if (user == null && !initialUserExists) {
-        return firstSetup ? null : '/first-setup';
-      }
-
       if (user == null) {
-        // Allow manual navigation to sign-up screen
         return firstSetup ? null : (loggingIn ? null : '/login');
       }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/production/view/new_batch_screen.dart';
+import 'package:jusel_app/features/stock/view/batch_detail_screen.dart';
 
 class BatchScreen extends StatefulWidget {
   const BatchScreen({super.key});
@@ -140,7 +141,10 @@ class _BatchScreenState extends State<BatchScreen> {
               ...filtered.map((batch) => Padding(
                     padding:
                         const EdgeInsets.only(bottom: JuselSpacing.s12),
-                    child: _BatchCard(batch: batch),
+                    child: _BatchCard(
+                      batch: batch,
+                      productName: _product.name,
+                    ),
                   )),
               const SizedBox(height: JuselSpacing.s12),
             ],
@@ -388,8 +392,12 @@ class _ListHeader extends StatelessWidget {
 
 class _BatchCard extends StatelessWidget {
   final _BatchSummary batch;
+  final String productName;
 
-  const _BatchCard({required this.batch});
+  const _BatchCard({
+    required this.batch,
+    required this.productName,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -397,92 +405,129 @@ class _BatchCard extends StatelessWidget {
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(JuselSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '#  Batch #${batch.id}',
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
-                  ),
-                ),
-                Text(
-                  _formatDate(batch.date),
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          // Calculate estimated values (assuming selling price is 2x unit cost for margin calculation)
+          final estimatedSellingPrice = batch.unitCost * 2;
+          final estimatedRevenue = estimatedSellingPrice * batch.producedUnits;
+          final estimatedMargin = ((estimatedSellingPrice - batch.unitCost) / estimatedSellingPrice) * 100;
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BatchDetailScreen(
+                batchCode: 'Batch #${batch.id}',
+                productName: productName,
+                badgeLabel: batch.tag,
+                producedAt: batch.date,
+                supplier: 'Fresh Farms Ltd',
+                producedUnits: batch.producedUnits,
+                stockAdded: batch.producedUnits,
+                totalCost: batch.totalCost,
+                unitCost: batch.unitCost,
+                unitCostChangePercent: -4.0, // Example: 4% decrease
+                estimatedRevenue: estimatedRevenue,
+                estimatedMarginPercent: estimatedMargin,
+                costBreakdown: {
+                  'Ingredients': batch.totalCost * 0.55,
+                  'Packaging': batch.totalCost * 0.15,
+                  'Labor': batch.totalCost * 0.20,
+                  'Gas': batch.totalCost * 0.10,
+                },
+                notes: batch.note ?? 'Production ran smoothly. New lemon supplier tested for this batch, acidity is slightly higher.',
+                relatedMovementLabel: 'Movement #${500 + batch.id}',
+                relatedMovementDelta: batch.producedUnits,
+              ),
             ),
-            const SizedBox(height: JuselSpacing.s16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _MetricColumn(
-                  label: 'Produced',
-                  value: '+${batch.producedUnits} units',
-                ),
-                _MetricColumn(
-                  label: 'Total Cost',
-                  value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
-                ),
-                _MetricColumn(
-                  label: 'Unit Cost',
-                  value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
-                ),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE9F8EF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    batch.tag,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: const Color(0xFF16A34A),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(JuselSpacing.s16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '#  Batch #${batch.id}',
+                    style: JuselTextStyles.bodyMedium.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: JuselColors.foreground,
                     ),
                   ),
-                ),
-                if (batch.note != null) ...[
-                  const SizedBox(width: JuselSpacing.s12),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_box_outline_blank_rounded,
-                        size: 16,
-                        color: JuselColors.mutedForeground,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        batch.note!,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    _formatDate(batch.date),
+                    style: JuselTextStyles.bodySmall.copyWith(
+                      color: JuselColors.mutedForeground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: JuselSpacing.s16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _MetricColumn(
+                    label: 'Produced',
+                    value: '+${batch.producedUnits} units',
+                  ),
+                  _MetricColumn(
+                    label: 'Total Cost',
+                    value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
+                  ),
+                  _MetricColumn(
+                    label: 'Unit Cost',
+                    value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: JuselSpacing.s16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9F8EF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      batch.tag,
+                      style: JuselTextStyles.bodySmall.copyWith(
+                        color: const Color(0xFF16A34A),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (batch.note != null) ...[
+                    const SizedBox(width: JuselSpacing.s12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.check_box_outline_blank_rounded,
+                          size: 16,
+                          color: JuselColors.mutedForeground,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          batch.note!,
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -2,7 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({super.key});
+  final String name;
+  final String role;
+  final String? phone;
+  final String? email;
+  final String? avatarAsset;
+  final String? initials;
+
+  const ResetPasswordScreen({
+    super.key,
+    required this.name,
+    required this.role,
+    this.phone,
+    this.email,
+    this.avatarAsset,
+    this.initials,
+  });
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -90,11 +105,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             children: [
               const Divider(height: 1, color: Color(0xFFE5E7EB)),
               const SizedBox(height: JuselSpacing.s16),
-              const _UserCard(),
+              _UserCard(
+                name: widget.name,
+                role: widget.role,
+                phone: widget.phone,
+                avatarAsset: widget.avatarAsset,
+                initials: widget.initials,
+              ),
               const SizedBox(height: JuselSpacing.s12),
-              const _InfoBanner(
+              _InfoBanner(
                 text:
-                    'You are resetting the password for John Doe. The apprentice will use these new credentials to log in.',
+                    'You are resetting the password for ${widget.name}. The user will use these new credentials to log in.',
               ),
               const SizedBox(height: JuselSpacing.s16),
               _PasswordField(
@@ -221,7 +242,24 @@ class _PasswordField extends StatelessWidget {
 }
 
 class _UserCard extends StatelessWidget {
-  const _UserCard();
+  final String name;
+  final String role;
+  final String? phone;
+  final String? avatarAsset;
+  final String? initials;
+
+  const _UserCard({
+    required this.name,
+    required this.role,
+    this.phone,
+    this.avatarAsset,
+    this.initials,
+  });
+
+  String get _roleLabel {
+    if (role.isEmpty) return '';
+    return role[0].toUpperCase() + role.substring(1).toLowerCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,20 +274,24 @@ class _UserCard extends StatelessWidget {
             CircleAvatar(
               radius: 22,
               backgroundColor: const Color(0xFFE5ECF9),
-              child: Text(
-                'JD',
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: JuselColors.foreground,
-                ),
-              ),
+              backgroundImage:
+                  avatarAsset != null ? AssetImage(avatarAsset!) : null,
+              child: avatarAsset == null
+                  ? Text(
+                      initials ?? _initialsFromName(name),
+                      style: JuselTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: JuselColors.foreground,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: JuselSpacing.s12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'John Doe',
+                  name,
                   style: JuselTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -267,7 +309,7 @@ class _UserCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        'Apprentice',
+                        _roleLabel,
                         style: JuselTextStyles.bodySmall.copyWith(
                           color: JuselColors.primary,
                           fontWeight: FontWeight.w700,
@@ -276,10 +318,11 @@ class _UserCard extends StatelessWidget {
                     ),
                     const SizedBox(width: JuselSpacing.s8),
                     Text(
-                      '+1 555 0123',
+                      phone ?? 'No phone added',
                       style: JuselTextStyles.bodySmall.copyWith(
                         color: JuselColors.mutedForeground,
                         fontWeight: FontWeight.w600,
+                        fontStyle: phone == null ? FontStyle.italic : null,
                       ),
                     ),
                   ],
@@ -291,6 +334,12 @@ class _UserCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _initialsFromName(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+  final initials = parts.take(2).map((p) => p[0].toUpperCase()).join();
+  return initials.isNotEmpty ? initials : 'JD';
 }
 
 class _InfoBanner extends StatelessWidget {

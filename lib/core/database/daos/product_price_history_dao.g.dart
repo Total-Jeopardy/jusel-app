@@ -7,3 +7,5 @@ mixin _$ProductPriceHistoryDaoMixin on DatabaseAccessor<AppDatabase> {
   $ProductPriceHistoryTableTable get productPriceHistoryTable =>
       attachedDatabase.productPriceHistoryTable;
 }
+
+

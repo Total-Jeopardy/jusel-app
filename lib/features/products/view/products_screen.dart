@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/account/view/account_screen.dart';
+import 'package:jusel_app/features/products/view/product_detail_screen.dart';
+import 'package:jusel_app/features/products/view/add_product_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -80,11 +84,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: CircleAvatar(
               radius: 16,
               backgroundColor: const Color(0xFFE5ECF9),
-              child: Text(
-                'JD',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: JuselColors.foreground,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AccountScreen()),
+                  );
+                },
+                child: Center(
+                  child: Text(
+                    'JD',
+                    style: JuselTextStyles.bodySmall.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: JuselColors.foreground,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -93,12 +107,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Navigate to add product
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const AddProductScreen()));
         },
         backgroundColor: JuselColors.primary,
         child: const Icon(Icons.add),
       ),
-      bottomNavigationBar: const _BottomNav(currentIndex: 1),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -134,14 +149,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
   List<_Product> _applyFilters(List<_Product> list) {
     final query = _searchController.text.toLowerCase().trim();
     return list.where((p) {
-      final matchesQuery = query.isEmpty ||
+      final matchesQuery =
+          query.isEmpty ||
           p.name.toLowerCase().contains(query) ||
           p.category.toLowerCase().contains(query);
       final matchesFilter = switch (_filter) {
         ProductFilter.all => true,
         ProductFilter.drinks => p.category.toLowerCase().contains('drink'),
-        ProductFilter.localDrinks =>
-            p.category.toLowerCase() == 'local drink',
+        ProductFilter.localDrinks => p.category.toLowerCase() == 'local drink',
         ProductFilter.snacks => p.category.toLowerCase() == 'snacks',
       };
       return matchesQuery && matchesFilter;
@@ -153,10 +168,7 @@ class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const _SearchBar({
-    required this.controller,
-    required this.onChanged,
-  });
+  const _SearchBar({required this.controller, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -185,38 +197,43 @@ class _FilterChips extends StatelessWidget {
   final ProductFilter selected;
   final ValueChanged<ProductFilter> onSelected;
 
-  const _FilterChips({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _FilterChips({required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: [
-          _Chip(
-            label: 'All',
-            active: selected == ProductFilter.all,
-            onTap: () => onSelected(ProductFilter.all),
-          ),
-          _Chip(
-            label: 'Drinks',
-            active: selected == ProductFilter.drinks,
-            onTap: () => onSelected(ProductFilter.drinks),
-          ),
-          _Chip(
-            label: 'Local Drinks',
-            active: selected == ProductFilter.localDrinks,
-            onTap: () => onSelected(ProductFilter.localDrinks),
-          ),
-          _Chip(
-            label: 'Snacks',
-            active: selected == ProductFilter.snacks,
-            onTap: () => onSelected(ProductFilter.snacks),
-          ),
-        ].map((w) => Padding(padding: const EdgeInsets.only(right: 8), child: w)).toList(),
+        children:
+            [
+                  _Chip(
+                    label: 'All',
+                    active: selected == ProductFilter.all,
+                    onTap: () => onSelected(ProductFilter.all),
+                  ),
+                  _Chip(
+                    label: 'Drinks',
+                    active: selected == ProductFilter.drinks,
+                    onTap: () => onSelected(ProductFilter.drinks),
+                  ),
+                  _Chip(
+                    label: 'Local Drinks',
+                    active: selected == ProductFilter.localDrinks,
+                    onTap: () => onSelected(ProductFilter.localDrinks),
+                  ),
+                  _Chip(
+                    label: 'Snacks',
+                    active: selected == ProductFilter.snacks,
+                    onTap: () => onSelected(ProductFilter.snacks),
+                  ),
+                ]
+                .map(
+                  (w) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: w,
+                  ),
+                )
+                .toList(),
       ),
     );
   }
@@ -227,11 +244,7 @@ class _Chip extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
-  const _Chip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _Chip({required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -264,80 +277,125 @@ class _ProductTile extends StatelessWidget {
 
   const _ProductTile({required this.product});
 
+  ProductsTableData _toProductsTableData(_Product product) {
+    // Convert ProductStatus enum to string
+    String statusString;
+    switch (product.status) {
+      case ProductStatus.good:
+        statusString = 'active';
+        break;
+      case ProductStatus.low:
+        statusString = 'active';
+        break;
+      case ProductStatus.out:
+        statusString = 'sold_out';
+        break;
+    }
+
+    return ProductsTableData(
+      id: 'temp_${product.name.hashCode}',
+      name: product.name,
+      category: product.category,
+      subcategory: null,
+      isProduced: false,
+      currentSellingPrice: product.price,
+      currentCostPrice: product.cost,
+      currentStockQty: product.statusCount,
+      unitsPerPack: null,
+      status: statusString,
+      createdAt: DateTime.now(),
+      updatedAt: null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = _statusStyle(product.status, product.statusCount);
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(JuselSpacing.s12),
-        leading: _ProductThumb(name: product.name),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                product.name,
-                overflow: TextOverflow.ellipsis,
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: JuselColors.foreground,
-                ),
-              ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ProductDetailScreen(product: _toProductsTableData(product)),
             ),
-            const SizedBox(width: JuselSpacing.s8),
-            Text(
-              'GHS ${product.price.toStringAsFixed(2)}',
-              style: JuselTextStyles.bodyMedium.copyWith(
-                fontWeight: FontWeight.w800,
-                color: JuselColors.foreground,
-              ),
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: JuselSpacing.s8),
-          child: Column(
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          padding: const EdgeInsets.all(JuselSpacing.s12),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text(
-                    product.category,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+              _ProductThumb(name: product.name),
+              const SizedBox(width: JuselSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: JuselTextStyles.bodyMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: JuselColors.foreground,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: JuselSpacing.s8),
+                        Text(
+                          'GHS ${product.price.toStringAsFixed(2)}',
+                          style: JuselTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: JuselColors.foreground,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: JuselSpacing.s8),
-                  _StatusPill(
-                    label: status.label,
-                    color: status.color,
-                    background: status.background,
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s6),
-              Text(
-                'Cost: GHS ${product.cost.toStringAsFixed(2)}',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
-                  fontWeight: FontWeight.w600,
+                    const SizedBox(height: JuselSpacing.s8),
+                    Row(
+                      children: [
+                        Text(
+                          product.category,
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                          ),
+                        ),
+                        const SizedBox(width: JuselSpacing.s8),
+                        _StatusPill(
+                          label: status.label,
+                          color: status.color,
+                          background: status.background,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: JuselSpacing.s6),
+                    Text(
+                      'Cost: GHS ${product.cost.toStringAsFixed(2)}',
+                      style: JuselTextStyles.bodySmall.copyWith(
+                        color: JuselColors.mutedForeground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: JuselColors.mutedForeground,
               ),
             ],
           ),
         ),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: JuselColors.mutedForeground,
-        ),
-        onTap: () {
-          // TODO: open product detail
-        },
       ),
     );
   }

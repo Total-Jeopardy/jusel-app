@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/stock/view/restock_success_screen.dart';
 
 class RestockScreen extends StatefulWidget {
   const RestockScreen({super.key});
@@ -16,6 +17,7 @@ class _RestockScreenState extends State<RestockScreen> {
     name: 'Cola 500ml',
     category: 'Drinks',
     currentStock: 4,
+    imageAsset: null,
   );
   final TextEditingController _packsController = TextEditingController(
     text: '5',
@@ -176,12 +178,20 @@ class _RestockScreenState extends State<RestockScreen> {
       return;
     }
     // TODO: Wire up to restock service / navigation.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Restock confirmed: adding $_totalUnitsAdding units at GHS ${_costPerUnit.toStringAsFixed(2)} each',
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RestockSuccessScreen(
+          productName: _product.name,
+          category: _product.category,
+          imageAsset: _product.imageAsset,
+          unitsAdded: _totalUnitsAdding,
+          newTotalStock: _previousStock + _totalUnitsAdding,
+          costPerUnit: _costPerUnit,
+          inventoryValueAdded: _totalCost,
+          restockedBy: 'Boss',
+          restockedOn: DateTime.now(),
         ),
-        backgroundColor: JuselColors.success,
       ),
     );
   }
@@ -834,10 +844,12 @@ class _ProductSummary {
   final String name;
   final String category;
   final int currentStock;
+  final String? imageAsset;
 
   const _ProductSummary({
     required this.name,
     required this.category,
     required this.currentStock,
+    this.imageAsset,
   });
 }

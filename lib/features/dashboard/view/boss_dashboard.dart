@@ -19,7 +19,26 @@ class BossDashboard extends StatefulWidget {
 class _BossDashboardState extends State<BossDashboard> {
   int _currentIndex = 0;
 
-  late final _pages = <Widget>[const DashboardHome()];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = <Widget>[
+      DashboardHome(onNavigateToTab: _setTab),
+      const ProductsScreen(),
+      const SalesScreen(),
+      const RestockScreen(),
+      const _ReportsPlaceholder(),
+    ];
+  }
+
+  void _setTab(int index) {
+    if (index == _currentIndex) return;
+    setState(() {
+      _currentIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +48,7 @@ class _BossDashboardState extends State<BossDashboard> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) => _setTab(i),
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
@@ -55,8 +74,26 @@ class _BossDashboardState extends State<BossDashboard> {
   }
 }
 
+class _ReportsPlaceholder extends StatelessWidget {
+  const _ReportsPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        'Reports coming soon',
+        style: JuselTextStyles.bodyMedium.copyWith(
+          color: JuselColors.mutedForeground,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
 class DashboardHome extends ConsumerWidget {
-  const DashboardHome({super.key});
+  final void Function(int) onNavigateToTab;
+  const DashboardHome({super.key, required this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,7 +118,7 @@ class DashboardHome extends ConsumerWidget {
               children: [
                 const _Header(),
                 const SizedBox(height: 20),
-                const _QuickActions(),
+                _QuickActions(onNavigateToTab: onNavigateToTab),
                 const SizedBox(height: 20),
                 _OverviewGrid(metrics: metrics),
                 const SizedBox(height: 20),
@@ -169,7 +206,8 @@ class _Header extends StatelessWidget {
 }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+  final void Function(int) onNavigateToTab;
+  const _QuickActions({required this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -184,10 +222,7 @@ class _QuickActions extends StatelessWidget {
               QuickActionCard(
                 icon: Icons.add,
                 label: 'Sale',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SalesScreen()),
-                ),
+                onTap: () => onNavigateToTab(2),
                 gradientColors: [
                   const Color(0xFF1F6BFF).withOpacity(0.16),
                   const Color(0xFF1F6BFF).withOpacity(0.08),
@@ -198,10 +233,7 @@ class _QuickActions extends StatelessWidget {
               QuickActionCard(
                 icon: Icons.inventory_2_outlined,
                 label: 'Restock',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RestockScreen()),
-                ),
+                onTap: () => onNavigateToTab(3),
                 gradientColors: [
                   const Color(0xFF22D3EE).withOpacity(0.16),
                   const Color(0xFF34D399).withOpacity(0.10),
@@ -226,10 +258,7 @@ class _QuickActions extends StatelessWidget {
               QuickActionCard(
                 icon: Icons.sell_outlined,
                 label: 'Product',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProductsScreen()),
-                ),
+                onTap: () => onNavigateToTab(1),
                 gradientColors: [
                   const Color(0xFF94A3B8).withOpacity(0.18),
                   const Color(0xFFE2E8F0).withOpacity(0.12),
