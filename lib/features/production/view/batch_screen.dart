@@ -441,92 +441,92 @@ class _BatchCard extends StatelessWidget {
             ),
           );
         },
-        child: Padding(
-          padding: const EdgeInsets.all(JuselSpacing.s16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '#  Batch #${batch.id}',
-                    style: JuselTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: JuselColors.foreground,
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.all(JuselSpacing.s16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '#  Batch #${batch.id}',
+                  style: JuselTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: JuselColors.foreground,
                   ),
-                  Text(
-                    _formatDate(batch.date),
+                ),
+                Text(
+                  _formatDate(batch.date),
+                  style: JuselTextStyles.bodySmall.copyWith(
+                    color: JuselColors.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: JuselSpacing.s16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _MetricColumn(
+                  label: 'Produced',
+                  value: '+${batch.producedUnits} units',
+                ),
+                _MetricColumn(
+                  label: 'Total Cost',
+                  value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
+                ),
+                _MetricColumn(
+                  label: 'Unit Cost',
+                  value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
+                ),
+              ],
+            ),
+            const SizedBox(height: JuselSpacing.s16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE9F8EF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    batch.tag,
                     style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
-                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF16A34A),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _MetricColumn(
-                    label: 'Produced',
-                    value: '+${batch.producedUnits} units',
-                  ),
-                  _MetricColumn(
-                    label: 'Total Cost',
-                    value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
-                  ),
-                  _MetricColumn(
-                    label: 'Unit Cost',
-                    value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE9F8EF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      batch.tag,
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: const Color(0xFF16A34A),
-                        fontWeight: FontWeight.w700,
+                ),
+                if (batch.note != null) ...[
+                  const SizedBox(width: JuselSpacing.s12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.check_box_outline_blank_rounded,
+                        size: 16,
+                        color: JuselColors.mutedForeground,
                       ),
-                    ),
-                  ),
-                  if (batch.note != null) ...[
-                    const SizedBox(width: JuselSpacing.s12),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.check_box_outline_blank_rounded,
-                          size: 16,
+                      const SizedBox(width: 6),
+                      Text(
+                        batch.note!,
+                        style: JuselTextStyles.bodySmall.copyWith(
                           color: JuselColors.mutedForeground,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          batch.note!,
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ],
-              ),
-            ],
+              ],
+            ),
+          ],
           ),
         ),
       ),

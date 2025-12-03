@@ -1,8 +1,4 @@
-import 'dart:math';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jusel_app/core/database/app_database.dart';
-import 'package:jusel_app/core/database/daos/pending_sync_queue_dao.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/services/inventory_service.dart';
 
@@ -21,7 +17,8 @@ class DashboardMetrics {
   final int lowStockCount;
   final int pendingSyncCount;
   final List<TopProductMetric> topProducts;
-  final List<double> trendValues; // revenue per day for last N days (oldest -> newest)
+  final List<double>
+  trendValues; // revenue per day for last N days (oldest -> newest)
 
   DashboardMetrics({
     required this.salesTotal,
@@ -46,8 +43,9 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
 
   // Sales movements (approx revenue using current selling price)
   final movements = await db.stockMovementsDao.getAllMovements();
-  final salesMovements =
-      movements.where((m) => m.type.toLowerCase() == 'sale').toList();
+  final salesMovements = movements
+      .where((m) => m.type.toLowerCase() == 'sale')
+      .toList();
 
   double salesTotal = 0;
   double profitTotal = 0;
@@ -57,8 +55,7 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
     final product = productMap[m.productId];
     if (product == null) continue;
     final qty = m.quantityUnits;
-    final revenue = m.totalRevenue ??
-        (product.currentSellingPrice * qty);
+    final revenue = m.totalRevenue ?? (product.currentSellingPrice * qty);
     final cost = m.totalCost ?? (product.currentCostPrice * qty);
     salesTotal += revenue;
     profitTotal += (revenue - cost);
@@ -75,29 +72,32 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
     if (product == null) continue;
     final dayDiff = now.difference(m.createdAt).inDays;
     if (dayDiff >= 0 && dayDiff < daysWindow) {
-      final revenue = m.totalRevenue ??
-          (product.currentSellingPrice * m.quantityUnits);
+      final revenue =
+          m.totalRevenue ?? (product.currentSellingPrice * m.quantityUnits);
       trendBuckets[daysWindow - 1 - dayDiff] += revenue;
     }
   }
 
   // Top products (by revenue)
-  final topProducts = revenueByProduct.entries
-      .map(
-        (e) => TopProductMetric(
-          name: productMap[e.key]?.name ?? 'Unknown',
-          revenue: e.value,
-        ),
-      )
-      .toList()
-    ..sort((a, b) => b.revenue.compareTo(a.revenue));
+  final topProducts =
+      revenueByProduct.entries
+          .map(
+            (e) => TopProductMetric(
+              name: productMap[e.key]?.name ?? 'Unknown',
+              revenue: e.value,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => b.revenue.compareTo(a.revenue));
   final top3 = topProducts.take(3).toList();
 
   // Inventory & production
   final inventoryValue = await inventoryService.getTotalInventoryValue();
   final productionBatches = await db.productionBatchesDao.getAllBatches();
-  final productionValue =
-      productionBatches.fold<double>(0, (sum, b) => sum + b.totalCost);
+  final productionValue = productionBatches.fold<double>(
+    0,
+    (sum, b) => sum + b.totalCost,
+  );
 
   // Low stock
   final lowStock = await inventoryService.getLowStockProducts();

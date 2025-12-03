@@ -1,63 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 import 'package:jusel_app/features/products/view/add_product_screen.dart';
+import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
-class ProductsScreen extends StatefulWidget {
+class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
 
   @override
-  State<ProductsScreen> createState() => _ProductsScreenState();
+  ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
+class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   final TextEditingController _searchController = TextEditingController();
   ProductFilter _filter = ProductFilter.all;
 
-  final List<_Product> _products = const [
-    _Product(
-      name: 'Orange Juice 1L',
-      category: 'Local Drink',
-      price: 3.50,
-      cost: 1.10,
-      status: ProductStatus.good,
-      statusCount: 12,
-    ),
-    _Product(
-      name: 'Cola 500ml',
-      category: 'Drinks',
-      price: 1.50,
-      cost: 0.80,
-      status: ProductStatus.low,
-      statusCount: 4,
-    ),
-    _Product(
-      name: 'Potato Chips Classic',
-      category: 'Snacks',
-      price: 2.00,
-      cost: 1.20,
-      status: ProductStatus.out,
-      statusCount: 0,
-    ),
-    _Product(
-      name: 'Mineral Water 1L',
-      category: 'Drinks',
-      price: 1.00,
-      cost: 0.40,
-      status: ProductStatus.good,
-      statusCount: 45,
-    ),
-    _Product(
-      name: 'Chocolate Bar',
-      category: 'Snacks',
-      price: 1.20,
-      cost: 0.75,
-      status: ProductStatus.good,
-      statusCount: 28,
-    ),
-  ];
+  List<_Product> _products = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final inventory = ref.read(inventoryServiceProvider);
+      final products = await db.productsDao.getAllProducts();
+      final stockMap = await inventory.getAllCurrentStock();
+      final mapped = products.map((p) {
+        final stock = stockMap[p.id] ?? p.currentStockQty ?? 0;
+        final status = _statusFromStock(stock);
+        return _Product(
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          price: p.currentSellingPrice,
+          cost: p.currentCostPrice,
+          status: status,
+          statusCount: stock,
+        );
+      }).toList();
+      setState(() {
+        _products = mapped;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load products: $e';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -132,18 +138,49 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 onSelected: (f) => setState(() => _filter = f),
               ),
               const SizedBox(height: JuselSpacing.s12),
-              ...filtered.map(
-                (p) => Padding(
-                  padding: const EdgeInsets.only(bottom: JuselSpacing.s12),
-                  child: _ProductTile(product: p),
+              if (_loading)
+                const Center(child: CircularProgressIndicator())
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.all(JuselSpacing.s12),
+                  child: Text(
+                    _error!,
+                    style: JuselTextStyles.bodyMedium.copyWith(
+                      color: JuselColors.destructive,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else if (filtered.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(JuselSpacing.s12),
+                  child: Text(
+                    'No products found.',
+                    style: JuselTextStyles.bodyMedium.copyWith(
+                      color: JuselColors.mutedForeground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else
+                ...filtered.map(
+                  (p) => Padding(
+                    padding: const EdgeInsets.only(bottom: JuselSpacing.s12),
+                    child: _ProductTile(product: p),
+                  ),
                 ),
-              ),
               const SizedBox(height: JuselSpacing.s20),
             ],
           ),
         ),
       ),
     );
+  }
+
+  ProductStatus _statusFromStock(int stock) {
+    if (stock <= 0) return ProductStatus.out;
+    if (stock <= 10) return ProductStatus.low;
+    return ProductStatus.good;
   }
 
   List<_Product> _applyFilters(List<_Product> list) {
@@ -293,7 +330,7 @@ class _ProductTile extends StatelessWidget {
     }
 
     return ProductsTableData(
-      id: 'temp_${product.name.hashCode}',
+      id: product.id,
       name: product.name,
       category: product.category,
       subcategory: null,
@@ -317,12 +354,27 @@ class _ProductTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  ProductDetailScreen(product: _toProductsTableData(product)),
-            ),
-          );
+          if (product.status == ProductStatus.low ||
+              product.status == ProductStatus.out) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StockDetailScreen(
+                  productId: product.id,
+                  productName: product.name,
+                  category: product.category,
+                  stockUnits: product.statusCount,
+                  unitCost: product.cost,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    ProductDetailScreen(product: _toProductsTableData(product)),
+              ),
+            );
+          }
         },
         child: Container(
           decoration: BoxDecoration(
@@ -519,6 +571,7 @@ class _BottomNav extends StatelessWidget {
 }
 
 class _Product {
+  final String id;
   final String name;
   final String category;
   final double price;
@@ -527,6 +580,7 @@ class _Product {
   final int statusCount;
 
   const _Product({
+    required this.id,
     required this.name,
     required this.category,
     required this.price,

@@ -22,13 +22,10 @@ class JuselCard extends StatelessWidget {
     return Card(
       color: backgroundColor ?? JuselColors.card,
       elevation: 1,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(JuselRadii.large),
       ),
-      child: Padding(
-        padding: customPadding ?? _getPadding(),
-        child: child,
-      ),
+      child: Padding(padding: customPadding ?? _getPadding(), child: child),
     );
   }
 
@@ -45,4 +42,3 @@ class JuselCard extends StatelessWidget {
     }
   }
 }
-

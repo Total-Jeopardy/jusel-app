@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/account/view/pending_items_screen.dart';
 
 class SyncStatusScreen extends StatelessWidget {
   const SyncStatusScreen({super.key});
@@ -104,7 +105,14 @@ class SyncStatusScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PendingItemsScreen(),
+                            ),
+                          );
+                        },
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             vertical: JuselSpacing.s16,

@@ -5,6 +5,7 @@ import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/sales/models/cart_item.dart';
 import 'package:jusel_app/features/sales/providers/cart_provider.dart';
+import 'package:jusel_app/features/sales/view/sales_completed_screen.dart';
 
 class CartView extends ConsumerWidget {
   const CartView({super.key});
@@ -19,7 +20,7 @@ class CartView extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.shopping_cart_outlined,
               size: 64,
               color: JuselColors.mutedForeground,
@@ -94,10 +95,7 @@ class CartView extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Total Amount',
-                    style: JuselTextStyles.bodyLarge,
-                  ),
+                  const Text('Total Amount', style: JuselTextStyles.bodyLarge),
                   Text(
                     'GHS ${cart.totalAmount.toStringAsFixed(2)}',
                     style: JuselTextStyles.headlineMedium.copyWith(
@@ -145,10 +143,7 @@ class CartView extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleFinalizeSale(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
+  Future<void> _handleFinalizeSale(BuildContext context, WidgetRef ref) async {
     final cart = ref.read(cartProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
     final salesService = ref.read(salesServiceProvider);
@@ -157,9 +152,7 @@ class CartView extends ConsumerWidget {
     if (user == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You must be logged in to make a sale'),
-          ),
+          const SnackBar(content: Text('You must be logged in to make a sale')),
         );
       }
       return;
@@ -174,14 +167,14 @@ class CartView extends ConsumerWidget {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
     }
 
     try {
       // Process each item in the cart
+      final itemsSnapshot = List<CartItem>.from(cart.items);
+      final subtotal = cart.totalAmount;
       for (final item in cart.items) {
         await salesService.sellProduct(
           productId: item.productId,
@@ -196,14 +189,16 @@ class CartView extends ConsumerWidget {
 
       if (context.mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Sale finalized successfully!'),
-            backgroundColor: JuselColors.success,
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SalesCompletedScreen(
+              items: itemsSnapshot,
+              subtotal: subtotal,
+              sellerName: user.displayName ?? 'Sales User',
+              paymentMethod: 'Cash',
+            ),
           ),
         );
-        // Navigate back or refresh
-        Navigator.of(context).pop();
       }
     } catch (e) {
       if (context.mounted) {
@@ -223,10 +218,7 @@ class _CartItemCard extends StatelessWidget {
   final CartItem item;
   final VoidCallback onDelete;
 
-  const _CartItemCard({
-    required this.item,
-    required this.onDelete,
-  });
+  const _CartItemCard({required this.item, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -243,10 +235,7 @@ class _CartItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.productName,
-                  style: JuselTextStyles.bodyLarge,
-                ),
+                Text(item.productName, style: JuselTextStyles.bodyLarge),
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
                   '${item.quantity} x GHS ${item.effectivePrice.toStringAsFixed(2)}',
@@ -266,7 +255,7 @@ class _CartItemCard extends StatelessWidget {
           const SizedBox(width: JuselSpacing.s8),
           GestureDetector(
             onTap: onDelete,
-            child: Icon(
+            child: const Icon(
               Icons.delete_outline,
               color: JuselColors.mutedForeground,
               size: 20,
@@ -277,4 +266,3 @@ class _CartItemCard extends StatelessWidget {
     );
   }
 }
-

@@ -1,23 +1,39 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/stock/view/restock_success_screen.dart';
 
-class RestockScreen extends StatefulWidget {
-  const RestockScreen({super.key});
+class RestockScreen extends ConsumerStatefulWidget {
+  final String? productId;
+  final String? productName;
+  final String? category;
+  final int? currentStock;
+  final String? imageAsset;
+
+  const RestockScreen({
+    super.key,
+    this.productId,
+    this.productName,
+    this.category,
+    this.currentStock,
+    this.imageAsset,
+  });
 
   @override
-  State<RestockScreen> createState() => _RestockScreenState();
+  ConsumerState<RestockScreen> createState() => _RestockScreenState();
 }
 
-class _RestockScreenState extends State<RestockScreen> {
+class _RestockScreenState extends ConsumerState<RestockScreen> {
   // Placeholder product for now; hook up to real selection later.
-  final _product = const _ProductSummary(
-    name: 'Cola 500ml',
-    category: 'Drinks',
-    currentStock: 4,
-    imageAsset: null,
+  late final _ProductSummary _product = _ProductSummary(
+    name: widget.productName ?? 'Cola 500ml',
+    category: widget.category ?? 'Drinks',
+    currentStock: widget.currentStock ?? 4,
+    imageAsset: widget.imageAsset,
   );
   final TextEditingController _packsController = TextEditingController(
     text: '5',
@@ -53,6 +69,7 @@ class _RestockScreenState extends State<RestockScreen> {
 
   static const double _previousCostPerUnit = 0.45;
   int get _previousStock => _product.currentStock;
+  bool _submitting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +151,7 @@ class _RestockScreenState extends State<RestockScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _handleConfirm,
+                  onPressed: _submitting ? null : _handleConfirm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: JuselColors.primary,
                     foregroundColor: JuselColors.primaryForeground,
@@ -167,8 +184,8 @@ class _RestockScreenState extends State<RestockScreen> {
     super.dispose();
   }
 
-  void _handleConfirm() {
-    if (_totalUnitsAdding <= 0 || _totalCost <= 0) {
+  Future<void> _handleConfirm() async {
+    if (_totalUnitsAdding <= 0 || _totalCost <= 0 || _costPerUnit <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Enter valid units and total cost to proceed'),
@@ -177,23 +194,72 @@ class _RestockScreenState extends State<RestockScreen> {
       );
       return;
     }
-    // TODO: Wire up to restock service / navigation.
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => RestockSuccessScreen(
-          productName: _product.name,
-          category: _product.category,
-          imageAsset: _product.imageAsset,
-          unitsAdded: _totalUnitsAdding,
-          newTotalStock: _previousStock + _totalUnitsAdding,
-          costPerUnit: _costPerUnit,
-          inventoryValueAdded: _totalCost,
-          restockedBy: 'Boss',
-          restockedOn: DateTime.now(),
+
+    final productId = widget.productId;
+    if (productId == null || productId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Missing product data for restock'),
+          backgroundColor: JuselColors.destructive,
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to restock'),
+          backgroundColor: JuselColors.destructive,
+        ),
+      );
+      return;
+    }
+    final userId = user.uid;
+    final restockedByDisplay = user.displayName?.trim().isNotEmpty == true
+        ? user.displayName!
+        : 'User';
+    final restockService = ref.read(restockServiceProvider);
+
+    setState(() => _submitting = true);
+    try {
+      await restockService.restockByUnits(
+        productId: productId,
+        units: _totalUnitsAdding,
+        costPerUnit: _costPerUnit,
+        createdByUserId: userId,
+      );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RestockSuccessScreen(
+            productName: _product.name,
+            category: _product.category,
+            imageAsset: _product.imageAsset,
+            unitsAdded: _totalUnitsAdding,
+            newTotalStock: _previousStock + _totalUnitsAdding,
+            costPerUnit: _costPerUnit,
+            inventoryValueAdded: _totalCost,
+            restockedBy: restockedByDisplay,
+            restockedOn: DateTime.now(),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Restock failed: $e'),
+            backgroundColor: JuselColors.destructive,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }
 

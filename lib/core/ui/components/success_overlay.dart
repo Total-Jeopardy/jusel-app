@@ -10,7 +10,6 @@ class SuccessOverlay {
     Duration duration = const Duration(seconds: 2),
   }) {
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
 
     OverlayEntry? entry;
     entry = OverlayEntry(

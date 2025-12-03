@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/account/view/account_screen.dart';
 
 
 
@@ -88,16 +88,22 @@ class ApprenticeDashboard extends StatelessWidget {
 
                   const Spacer(),
 
-                  const CircleAvatar(
-
-                    radius: 22,
-
-                    backgroundImage: AssetImage(
-
-                      'assets/avatar_placeholder.png',
-
+                  InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AccountScreen(),
+                        ),
+                      );
+                    },
+                    child: const CircleAvatar(
+                      radius: 22,
+                      backgroundImage: AssetImage(
+                        'assets/avatar_placeholder.png',
+                      ),
                     ),
-
                   ),
 
                 ],

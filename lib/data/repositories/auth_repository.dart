@@ -112,6 +112,15 @@ class AuthRepository {
     await auth.signOut();
   }
 
+  /// Reset a user's password by email (sends reset link).
+  /// For admin-driven resets, replace with a secure backend/Cloud Function.
+  Future<void> resetUserPassword({
+    required String email,
+    String? newPassword, // retained for future backend-based direct reset
+  }) async {
+    await auth.sendPasswordResetEmail(email: email);
+  }
+
   /// Create a user. If [enforceFirstUser] is true, it only allows creation
   /// when no users exist yet (first-time setup).
   Future<AppUser> signUpUser({

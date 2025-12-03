@@ -8,7 +8,7 @@ import 'package:jusel_app/core/utils/theme.dart';
 class ProductSelectionModal extends ConsumerStatefulWidget {
   final ProductsTableData product;
   final Function(String productId, int quantity, double? overriddenPrice)?
-      onAddToSale;
+  onAddToSale;
 
   const ProductSelectionModal({
     super.key,
@@ -24,21 +24,18 @@ class ProductSelectionModal extends ConsumerStatefulWidget {
     BuildContext context, {
     required ProductsTableData product,
     Function(String productId, int quantity, double? overriddenPrice)?
-        onAddToSale,
+    onAddToSale,
   }) {
     return showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => ProductSelectionModal(
-        product: product,
-        onAddToSale: onAddToSale,
-      ),
+      builder: (context) =>
+          ProductSelectionModal(product: product, onAddToSale: onAddToSale),
     );
   }
 }
 
-class _ProductSelectionModalState
-    extends ConsumerState<ProductSelectionModal> {
+class _ProductSelectionModalState extends ConsumerState<ProductSelectionModal> {
   late TextEditingController _quantityController;
   late TextEditingController _priceController;
   int _quantity = 1;
@@ -109,7 +106,8 @@ class _ProductSelectionModalState
       if (!_showPriceOverrideField) {
         _isPriceOverridden = false;
         _overriddenPrice = null;
-        _priceController.text = widget.product.currentSellingPrice.toStringAsFixed(2);
+        _priceController.text = widget.product.currentSellingPrice
+            .toStringAsFixed(2);
       }
     });
   }
@@ -216,7 +214,9 @@ class _ProductSelectionModalState
                     )
                   : Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: JuselColors.success.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -273,18 +273,18 @@ class _ProductSelectionModalState
                                 width: 120,
                                 child: TextField(
                                   controller: _priceController,
-                                  keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   inputFormatters: [
                                     FilteringTextInputFormatter.allow(
                                       RegExp(r'^\d+\.?\d{0,2}'),
                                     ),
                                   ],
                                   onChanged: _onPriceChanged,
-                                  style: JuselTextStyles.headlineMedium.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: JuselTextStyles.headlineMedium
+                                      .copyWith(fontWeight: FontWeight.w700),
                                   decoration: InputDecoration(
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
@@ -360,7 +360,9 @@ class _ProductSelectionModalState
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: _quantity > 1 ? () => _updateQuantity(-1) : null,
+                                onTap: _quantity > 1
+                                    ? () => _updateQuantity(-1)
+                                    : null,
                                 borderRadius: const BorderRadius.only(
                                   topLeft: Radius.circular(8),
                                   bottomLeft: Radius.circular(8),
@@ -384,7 +386,9 @@ class _ProductSelectionModalState
                             // Quantity Input
                             Container(
                               width: 60,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                               color: Colors.white,
                               child: TextField(
                                 controller: _quantityController,
@@ -453,7 +457,7 @@ class _ProductSelectionModalState
                 ),
                 child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.error_outline,
                       size: 18,
                       color: JuselColors.destructive,
@@ -507,4 +511,3 @@ class _ProductSelectionModalState
     );
   }
 }
-

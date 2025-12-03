@@ -1,7 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
+class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String name;
   final String role;
   final String? phone;
@@ -20,14 +23,16 @@ class ResetPasswordScreen extends StatefulWidget {
   });
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _showNew = false;
   bool _showConfirm = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -68,8 +73,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           children: [
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _canSubmit ? _handleReset : null,
+                child: ElevatedButton(
+                onPressed: _submitting || !_canSubmit ? null : _handleReset,
                 style: ElevatedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(vertical: JuselSpacing.s16),
@@ -115,7 +120,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               const SizedBox(height: JuselSpacing.s12),
               _InfoBanner(
                 text:
-                    'You are resetting the password for ${widget.name}. The user will use these new credentials to log in.',
+                    'You are sending a password reset email for ${widget.name}. The user will set a new password from their inbox.',
               ),
               const SizedBox(height: JuselSpacing.s16),
               _PasswordField(
@@ -156,14 +161,56 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     );
   }
 
-  void _handleReset() {
-    // TODO: Hook to reset password service.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password reset'),
-        backgroundColor: JuselColors.success,
-      ),
-    );
+  Future<void> _handleReset() async {
+    final email = widget.email;
+    if (email == null || email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No email available for this user.'),
+          backgroundColor: JuselColors.destructive,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final authRepo = ref.read(authRepositoryProvider);
+      await authRepo.resetUserPassword(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reset email sent to $email'),
+          backgroundColor: JuselColors.success,
+        ),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      String message = 'Reset failed';
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'user-not-found':
+            message = 'No account found with this email.';
+            break;
+          case 'invalid-email':
+            message = 'Invalid email address.';
+            break;
+          default:
+            message = e.message ?? 'Reset failed. Please try again.';
+        }
+      } else {
+        message = 'Reset failed: $e';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: JuselColors.destructive,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 }
 

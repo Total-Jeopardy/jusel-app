@@ -120,7 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ),
                                 ),
                                 const SizedBox(height: JuselSpacing.s8),
-                                Text(
+                                const Text(
                                   'Welcome back',
                                   style: JuselTextStyles.headlineLarge,
                                 ),

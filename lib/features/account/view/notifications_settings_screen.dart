@@ -50,7 +50,7 @@ class _NotificationsSettingsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SystemStatusCard(
+                    const _SystemStatusCard(
                       title: 'Allowed on this device',
                       subtitle: 'Notifications are enabled in system settings.',
                     ),
@@ -86,8 +86,8 @@ class _NotificationsSettingsScreenState
                           value: _dailySummary,
                           onChanged: (val) =>
                               setState(() => _dailySummary = val),
-                          footer: Row(
-                            children: const [
+                          footer: const Row(
+                            children: [
                               Icon(
                                 Icons.check_circle,
                                 size: 16,
@@ -335,7 +335,7 @@ class _ToggleTile extends StatelessWidget {
                 Switch(
                   value: value,
                   onChanged: onChanged,
-                  activeColor: Colors.white,
+                  activeThumbColor: Colors.white,
                   activeTrackColor: JuselColors.primary,
                 ),
               ],

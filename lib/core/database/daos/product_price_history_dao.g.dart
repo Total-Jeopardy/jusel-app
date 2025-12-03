@@ -9,3 +9,4 @@ mixin _$ProductPriceHistoryDaoMixin on DatabaseAccessor<AppDatabase> {
 }
 
 
+

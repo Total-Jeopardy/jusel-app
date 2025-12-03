@@ -60,11 +60,14 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                     _SettingsSection(
                       title: 'GENERAL INFO',
                       children: [
-                        _SettingTile(
+                        const _SettingTile(
                           label: 'Shop Name *',
                           value: 'Jusel Store',
                         ),
-                        _SettingTile(label: 'Phone', value: '+233 55 123 4567'),
+                        const _SettingTile(
+                          label: 'Phone',
+                          value: '+233 55 123 4567',
+                        ),
                         _SettingTile(
                           label: 'Address',
                           value: 'Add address (Optional)',
@@ -73,10 +76,10 @@ class _ShopSettingsScreenState extends State<ShopSettingsScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        _SettingTile(
+                        const _SettingTile(
                           label: 'Currency',
                           value: 'GHS (Ghana Cedi)',
-                          trailing: const Icon(
+                          trailing: Icon(
                             Icons.chevron_right,
                             color: JuselColors.mutedForeground,
                           ),
@@ -170,7 +173,7 @@ class _ShopLogo extends StatelessWidget {
     return Container(
       width: 96,
       height: 96,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: JuselColors.muted,
         shape: BoxShape.circle,
       ),
@@ -323,7 +326,7 @@ class _ToggleTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: JuselColors.primary,
           ),
         ],

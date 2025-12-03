@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/ui/components/quick_action_card.dart';
+import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_provider.dart';
-import 'package:jusel_app/features/notifications/view/notifications_screen.dart';
 import 'package:jusel_app/features/production/view/batch_screen.dart';
 import 'package:jusel_app/features/products/view/products_screen.dart';
 import 'package:jusel_app/features/sales/view/sales_screen.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
+import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
 class BossDashboard extends StatefulWidget {
   const BossDashboard({super.key});
@@ -189,13 +190,22 @@ class _Header extends StatelessWidget {
               ),
             ),
             const SizedBox(width: JuselSpacing.s6),
-            const CircleAvatar(
-              radius: 25,
-              backgroundColor: JuselColors.muted,
-              child: Icon(
-                Icons.person,
-                size: 25,
-                color: JuselColors.mutedForeground,
+            InkWell(
+              borderRadius: BorderRadius.circular(25),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AccountScreen()),
+                );
+              },
+              child: const CircleAvatar(
+                radius: 25,
+                backgroundColor: JuselColors.muted,
+                child: Icon(
+                  Icons.person,
+                  size: 25,
+                  color: JuselColors.mutedForeground,
+                ),
               ),
             ),
           ],
@@ -310,6 +320,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.attach_money,
         value: _formatCurrency(metrics.salesTotal),
         delta: null,
+        deltaPositive: false,
         iconColor: const Color(0xFF1F6BFF),
       ),
       _OverviewItem(
@@ -317,6 +328,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.access_time,
         value: _formatCurrency(metrics.profitTotal),
         delta: null,
+        deltaPositive: false,
         valueColor: JuselColors.primary,
         iconColor: JuselColors.primary,
       ),
@@ -325,6 +337,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.all_inbox_outlined,
         value: _formatCurrency(metrics.inventoryValue),
         delta: null,
+        deltaPositive: false,
         iconColor: const Color(0xFF10B981),
       ),
       _OverviewItem(
@@ -332,6 +345,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.show_chart_outlined,
         value: _formatCurrency(metrics.productionValue),
         delta: null,
+        deltaPositive: false,
         iconColor: const Color(0xFFF59E0B),
       ),
       _OverviewItem(
@@ -339,6 +353,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.error_outline,
         value: metrics.lowStockCount.toString(),
         delta: 'Items need attention',
+        deltaPositive: false,
         showDeltaIcon: false,
         background: const Color(0xFFFFF1F2),
         valueColor: const Color(0xFFDC2626),
@@ -350,6 +365,7 @@ class _OverviewGrid extends StatelessWidget {
         icon: Icons.sync_disabled_outlined,
         value: metrics.pendingSyncCount.toString(),
         delta: 'All synced',
+        deltaPositive: false,
         showDeltaIcon: false,
         iconColor: JuselColors.mutedForeground,
         deltaColor: JuselColors.mutedForeground,
@@ -438,13 +454,13 @@ class _OverviewItem extends StatelessWidget {
     required this.icon,
     required this.value,
     this.delta,
-    this.deltaPositive = true,
     this.valueColor,
     this.background,
     this.titleColor,
     this.iconColor,
     this.showDeltaIcon = true,
     this.deltaColor,
+    required this.deltaPositive,
   });
 
   @override
@@ -544,7 +560,15 @@ class _AlertsCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              MaterialPageRoute(
+                builder: (_) => const StockDetailScreen(
+                  productId: 'prod_cola',
+                  productName: 'Cola 500ml',
+                  category: 'Beverages',
+                  stockUnits: 4,
+                  unitCost: 0.85,
+                ),
+              ),
             ),
             child: Container(
               padding: const EdgeInsets.all(JuselSpacing.s16),

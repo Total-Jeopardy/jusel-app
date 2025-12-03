@@ -427,7 +427,7 @@ class _FooterButtons extends StatelessWidget {
               context.go('/apprentice-dashboard');
             },
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: JuselColors.muted),
+              side: const BorderSide(color: JuselColors.muted),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

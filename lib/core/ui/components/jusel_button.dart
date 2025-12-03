@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 enum JuselButtonVariant { primary, secondary, outline, ghost }
+
 enum JuselButtonSize { small, medium, large }
 
 class JuselButton extends StatelessWidget {
@@ -61,7 +62,7 @@ class JuselButton extends StatelessWidget {
           backgroundColor: JuselColors.primary,
           foregroundColor: JuselColors.primaryForeground,
           elevation: 1,
-          shape: RoundedRectangleBorder(
+          shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
         );
@@ -70,7 +71,7 @@ class JuselButton extends StatelessWidget {
           backgroundColor: JuselColors.secondary,
           foregroundColor: JuselColors.secondaryForeground,
           elevation: 1,
-          shape: RoundedRectangleBorder(
+          shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
         );
@@ -80,7 +81,7 @@ class JuselButton extends StatelessWidget {
           foregroundColor: JuselColors.primary,
           elevation: 0,
           side: const BorderSide(color: JuselColors.primary),
-          shape: RoundedRectangleBorder(
+          shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
         );
@@ -89,7 +90,7 @@ class JuselButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           foregroundColor: JuselColors.foreground,
           elevation: 0,
-          shape: RoundedRectangleBorder(
+          shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
         );
@@ -119,17 +120,11 @@ class JuselButton extends StatelessWidget {
   TextStyle _getTextStyle() {
     switch (size) {
       case JuselButtonSize.small:
-        return JuselTextStyles.bodySmall.copyWith(
-          fontWeight: FontWeight.w600,
-        );
+        return JuselTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600);
       case JuselButtonSize.medium:
-        return JuselTextStyles.bodyMedium.copyWith(
-          fontWeight: FontWeight.w600,
-        );
+        return JuselTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600);
       case JuselButtonSize.large:
-        return JuselTextStyles.bodyLarge.copyWith(
-          fontWeight: FontWeight.w600,
-        );
+        return JuselTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600);
     }
   }
 
@@ -144,4 +139,3 @@ class JuselButton extends StatelessWidget {
     }
   }
 }
-

@@ -53,8 +53,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to load products'),
+        const SnackBar(
+          content: Text('Failed to load products'),
           backgroundColor: JuselColors.destructive,
         ),
       );
@@ -93,8 +93,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     if (product == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Product not found or unavailable'),
+        const SnackBar(
+          content: Text('Product not found or unavailable'),
           backgroundColor: JuselColors.destructive,
         ),
       );
@@ -265,7 +265,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.search_off,
                           size: 64,
                           color: JuselColors.mutedForeground,
