@@ -1,64 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/production/view/new_batch_screen.dart';
 import 'package:jusel_app/features/stock/view/batch_detail_screen.dart';
 
-class BatchScreen extends StatefulWidget {
-  const BatchScreen({super.key});
+final _producedProductsProvider =
+    FutureProvider.autoDispose<List<ProductsTableData>>((ref) async {
+      final db = ref.read(appDatabaseProvider);
+      final products = await db.productsDao.getAllProducts();
+      return products.where((p) => p.isProduced == true).toList();
+    });
 
-  @override
-  State<BatchScreen> createState() => _BatchScreenState();
+class _BatchView {
+  final ProductionBatchesTableData batch;
+  final ProductsTableData product;
+  const _BatchView({required this.batch, required this.product});
 }
 
-class _BatchScreenState extends State<BatchScreen> {
-  static const _product = _ProductSummary(
-    name: 'Homemade Lemonade',
-    currentStock: 42,
-  );
+final _batchesProvider = FutureProvider.autoDispose
+    .family<List<_BatchView>, String?>((ref, productId) async {
+      final db = ref.read(appDatabaseProvider);
+      final products = await db.productsDao.getAllProducts();
+      final productMap = {for (var p in products) p.id: p};
 
-  final List<_BatchSummary> _batches = [
-    _BatchSummary(
-      id: 104,
-      producedUnits: 20,
-      totalCost: 14.50,
-      unitCost: 0.73,
-      date: DateTime.now(),
-      tag: 'LOCAL DRINK',
-    ),
-    _BatchSummary(
-      id: 103,
-      producedUnits: 50,
-      totalCost: 32.00,
-      unitCost: 0.64,
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      tag: 'LOCAL DRINK',
-      note: 'Sugar reduced',
-    ),
-    _BatchSummary(
-      id: 102,
-      producedUnits: 45,
-      totalCost: 29.50,
-      unitCost: 0.66,
-      date: DateTime.now().subtract(const Duration(days: 7)),
-      tag: 'LOCAL DRINK',
-    ),
-    _BatchSummary(
-      id: 101,
-      producedUnits: 40,
-      totalCost: 26.00,
-      unitCost: 0.65,
-      date: DateTime.now().subtract(const Duration(days: 10)),
-      tag: 'LOCAL DRINK',
-      note: 'New lemon supplier',
-    ),
-  ];
+      final batches = productId == null
+          ? await db.productionBatchesDao.getAllBatches()
+          : await db.productionBatchesDao.getBatchesForProduct(productId);
 
+      return batches
+          .where((b) => productMap[b.productId] != null)
+          .map((b) => _BatchView(batch: b, product: productMap[b.productId]!))
+          .toList();
+    });
+
+const _allProductsKey = '__all_products__';
+
+class BatchScreen extends ConsumerStatefulWidget {
+  final String? productId;
+
+  const BatchScreen({super.key, this.productId});
+
+  @override
+  ConsumerState<BatchScreen> createState() => _BatchScreenState();
+}
+
+class _BatchScreenState extends ConsumerState<BatchScreen> {
   DateFilter _dateFilter = DateFilter.all;
   SortOption _sort = SortOption.dateDesc;
+  String? _selectedProductId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProductId = widget.productId;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _applyFilters(_batches);
+    final producedAsync = ref.watch(_producedProductsProvider);
+    final batchesAsync = ref.watch(_batchesProvider(_selectedProductId));
 
     return Scaffold(
       backgroundColor: JuselColors.background,
@@ -66,7 +69,7 @@ class _BatchScreenState extends State<BatchScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Production Batches',
@@ -79,9 +82,7 @@ class _BatchScreenState extends State<BatchScreen> {
               Icons.filter_alt_outlined,
               color: JuselColors.primary,
             ),
-            onPressed: () {
-              // TODO: open filter sheet
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -90,11 +91,34 @@ class _BatchScreenState extends State<BatchScreen> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NewBatchScreen()),
-              );
-            },
+            onPressed: producedAsync.maybeWhen(
+              data: (products) {
+                if (products.isEmpty) return null;
+                return () {
+                  final product = products.firstWhere(
+                    (p) => p.id == _selectedProductId,
+                    orElse: () => products.first,
+                  );
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => NewBatchScreen(
+                            productId: product.id,
+                            productName: product.name,
+                            productTags: product.category,
+                            currentStock: product.currentStockQty,
+                          ),
+                        ),
+                      )
+                      .then(
+                        (_) => ref.invalidate(
+                          _batchesProvider(_selectedProductId),
+                        ),
+                      );
+                };
+              },
+              orElse: () => null,
+            ),
             icon: const Icon(Icons.add_circle_outline),
             label: const Text(
               'Add New Batch',
@@ -117,7 +141,44 @@ class _BatchScreenState extends State<BatchScreen> {
             children: [
               const Divider(height: 1, color: Color(0xFFE5E7EB)),
               const SizedBox(height: JuselSpacing.s16),
-              const _ProductCard(product: _product),
+              producedAsync.when(
+                loading: () => const _ProductCard(product: null),
+                error: (e, _) => const _ProductCard(
+                  product: null,
+                  errorText: 'Failed to load products',
+                ),
+                data: (products) {
+                  ProductsTableData? selected;
+                  if (products.isNotEmpty) {
+                    selected = products.firstWhere(
+                      (p) => p.id == _selectedProductId,
+                      orElse: () => products.first,
+                    );
+                  }
+                  return _ProductCard(
+                    product: selected,
+                    productCount: products.length,
+                    onTap: products.isEmpty
+                        ? null
+                        : () async {
+                            final choice = await showModalBottomSheet<String?>(
+                              context: context,
+                              builder: (context) {
+                                return _ProductPicker(
+                                  products: products,
+                                  selectedId: _selectedProductId,
+                                );
+                              },
+                            );
+                            if (choice == null) return;
+                            setState(
+                              () => _selectedProductId =
+                                  choice == _allProductsKey ? null : choice,
+                            );
+                          },
+                  );
+                },
+              ),
               const SizedBox(height: JuselSpacing.s20),
               _FilterRow(
                 selected: _dateFilter,
@@ -126,27 +187,78 @@ class _BatchScreenState extends State<BatchScreen> {
                 },
               ),
               const SizedBox(height: JuselSpacing.s16),
-              _ListHeader(
-                count: filtered.length,
-                sortOption: _sort,
-                onSortTapped: () {
-                  setState(() {
-                    _sort = _sort == SortOption.dateDesc
-                        ? SortOption.dateAsc
-                        : SortOption.dateDesc;
-                  });
+              batchesAsync.when(
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(JuselSpacing.s12),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.all(JuselSpacing.s12),
+                  child: Text(
+                    'Failed to load batches: $e',
+                    style: JuselTextStyles.bodyMedium.copyWith(
+                      color: JuselColors.destructive,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                data: (batches) {
+                  final filtered = _applyFilters(batches);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ListHeader(
+                        count: filtered.length,
+                        sortOption: _sort,
+                        onSortTapped: () {
+                          setState(() {
+                            _sort = _sort == SortOption.dateDesc
+                                ? SortOption.dateAsc
+                                : SortOption.dateDesc;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: JuselSpacing.s12),
+                      if (filtered.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(JuselSpacing.s12),
+                          child: Text(
+                            'No batches found.',
+                            style: JuselTextStyles.bodyMedium.copyWith(
+                              color: JuselColors.mutedForeground,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      else
+                        ...filtered.map(
+                          (batch) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: JuselSpacing.s12,
+                            ),
+                            child: _BatchCard(
+                              batch: batch.batch,
+                              productName: batch.product.name,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BatchDetailScreen(
+                                      batchId: batch.batch.id,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: JuselSpacing.s12),
+                    ],
+                  );
                 },
               ),
-              const SizedBox(height: JuselSpacing.s12),
-              ...filtered.map((batch) => Padding(
-                    padding:
-                        const EdgeInsets.only(bottom: JuselSpacing.s12),
-                    child: _BatchCard(
-                      batch: batch,
-                      productName: _product.name,
-                    ),
-                  )),
-              const SizedBox(height: JuselSpacing.s12),
             ],
           ),
         ),
@@ -154,7 +266,7 @@ class _BatchScreenState extends State<BatchScreen> {
     );
   }
 
-  List<_BatchSummary> _applyFilters(List<_BatchSummary> batches) {
+  List<_BatchView> _applyFilters(List<_BatchView> batches) {
     final now = DateTime.now();
     DateTime? cutoff;
     switch (_dateFilter) {
@@ -170,19 +282,30 @@ class _BatchScreenState extends State<BatchScreen> {
     }
 
     var list = cutoff == null
-        ? List<_BatchSummary>.from(batches)
-        : batches.where((b) => b.date.isAfter(cutoff!)).toList();
+        ? List<_BatchView>.from(batches)
+        : batches.where((b) => b.batch.createdAt.isAfter(cutoff!)).toList();
 
-    list.sort((a, b) =>
-        _sort == SortOption.dateDesc ? b.date.compareTo(a.date) : a.date.compareTo(b.date));
+    list.sort(
+      (a, b) => _sort == SortOption.dateDesc
+          ? b.batch.createdAt.compareTo(a.batch.createdAt)
+          : a.batch.createdAt.compareTo(b.batch.createdAt),
+    );
     return list;
   }
 }
 
 class _ProductCard extends StatelessWidget {
-  final _ProductSummary product;
+  final ProductsTableData? product;
+  final int? productCount;
+  final VoidCallback? onTap;
+  final String? errorText;
 
-  const _ProductCard({required this.product});
+  const _ProductCard({
+    required this.product,
+    this.productCount,
+    this.onTap,
+    this.errorText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -192,9 +315,7 @@ class _ProductCard extends StatelessWidget {
       elevation: 1,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          // TODO: open product picker
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(JuselSpacing.s16),
           child: Row(
@@ -203,42 +324,50 @@ class _ProductCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Product',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          'Product',
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (productCount != null) ...[
+                          const SizedBox(width: JuselSpacing.s6),
+                          Text(
+                            '(${productCount == 0 ? 'None' : productCount})',
+                            style: JuselTextStyles.bodySmall.copyWith(
+                              color: JuselColors.mutedForeground,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: JuselSpacing.s6),
-                    Text(
-                      product.name,
-                      style: JuselTextStyles.headlineSmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: JuselColors.foreground,
+                    if (product == null && errorText != null)
+                      Text(
+                        errorText!,
+                        style: JuselTextStyles.bodyMedium.copyWith(
+                          color: JuselColors.destructive,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else
+                      Text(
+                        product?.name ?? 'All Products',
+                        style: JuselTextStyles.headlineSmall.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.foreground,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    product.currentStock.toString(),
-                    style: JuselTextStyles.headlineMedium.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: JuselColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: JuselSpacing.s4),
-                  Text(
-                    'Current Stock',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
-                    ),
-                  ),
-                ],
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: JuselColors.mutedForeground,
               ),
             ],
           ),
@@ -248,14 +377,102 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
+class _ProductPicker extends StatelessWidget {
+  final List<ProductsTableData> products;
+  final String? selectedId;
+
+  const _ProductPicker({required this.products, required this.selectedId});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: JuselColors.mutedForeground.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: JuselSpacing.s16,
+              vertical: JuselSpacing.s8,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Product',
+                  style: JuselTextStyles.headlineSmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${products.length} total',
+                  style: JuselTextStyles.bodySmall.copyWith(
+                    color: JuselColors.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            onTap: () => Navigator.pop(context, _allProductsKey),
+            title: const Text('All Products'),
+            trailing: selectedId == null
+                ? const Icon(Icons.check, color: JuselColors.primary)
+                : null,
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final product = products[index];
+                final selected = selectedId == product.id;
+                return ListTile(
+                  onTap: () => Navigator.pop(context, product.id),
+                  title: Text(
+                    product.name,
+                    style: JuselTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: product.category.trim().isNotEmpty
+                      ? Text(
+                          product.category,
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
+                  trailing: selected
+                      ? const Icon(Icons.check, color: JuselColors.primary)
+                      : null,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FilterRow extends StatelessWidget {
   final DateFilter selected;
   final ValueChanged<DateFilter> onSelected;
 
-  const _FilterRow({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _FilterRow({required this.selected, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +546,9 @@ class _FilterChip extends StatelessWidget {
             label,
             style: JuselTextStyles.bodySmall.copyWith(
               fontWeight: FontWeight.w700,
-              color: isActive ? JuselColors.primary : JuselColors.mutedForeground,
+              color: isActive
+                  ? JuselColors.primary
+                  : JuselColors.mutedForeground,
             ),
           ),
         ),
@@ -391,12 +610,14 @@ class _ListHeader extends StatelessWidget {
 }
 
 class _BatchCard extends StatelessWidget {
-  final _BatchSummary batch;
+  final ProductionBatchesTableData batch;
   final String productName;
+  final VoidCallback? onTap;
 
   const _BatchCard({
     required this.batch,
     required this.productName,
+    this.onTap,
   });
 
   @override
@@ -407,126 +628,93 @@ class _BatchCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          // Calculate estimated values (assuming selling price is 2x unit cost for margin calculation)
-          final estimatedSellingPrice = batch.unitCost * 2;
-          final estimatedRevenue = estimatedSellingPrice * batch.producedUnits;
-          final estimatedMargin = ((estimatedSellingPrice - batch.unitCost) / estimatedSellingPrice) * 100;
-
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => BatchDetailScreen(
-                batchCode: 'Batch #${batch.id}',
-                productName: productName,
-                badgeLabel: batch.tag,
-                producedAt: batch.date,
-                supplier: 'Fresh Farms Ltd',
-                producedUnits: batch.producedUnits,
-                stockAdded: batch.producedUnits,
-                totalCost: batch.totalCost,
-                unitCost: batch.unitCost,
-                unitCostChangePercent: -4.0, // Example: 4% decrease
-                estimatedRevenue: estimatedRevenue,
-                estimatedMarginPercent: estimatedMargin,
-                costBreakdown: {
-                  'Ingredients': batch.totalCost * 0.55,
-                  'Packaging': batch.totalCost * 0.15,
-                  'Labor': batch.totalCost * 0.20,
-                  'Gas': batch.totalCost * 0.10,
-                },
-                notes: batch.note ?? 'Production ran smoothly. New lemon supplier tested for this batch, acidity is slightly higher.',
-                relatedMovementLabel: 'Movement #${500 + batch.id}',
-                relatedMovementDelta: batch.producedUnits,
-              ),
-            ),
-          );
-        },
-      child: Padding(
-        padding: const EdgeInsets.all(JuselSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '#  Batch #${batch.id}',
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
-                  ),
-                ),
-                Text(
-                  _formatDate(batch.date),
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _MetricColumn(
-                  label: 'Produced',
-                  value: '+${batch.producedUnits} units',
-                ),
-                _MetricColumn(
-                  label: 'Total Cost',
-                  value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
-                ),
-                _MetricColumn(
-                  label: 'Unit Cost',
-                  value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
-                ),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE9F8EF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    batch.tag,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: const Color(0xFF16A34A),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(JuselSpacing.s16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '#  Batch #${batch.id}',
+                    style: JuselTextStyles.bodyMedium.copyWith(
                       fontWeight: FontWeight.w700,
+                      color: JuselColors.foreground,
                     ),
                   ),
-                ),
-                if (batch.note != null) ...[
-                  const SizedBox(width: JuselSpacing.s12),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_box_outline_blank_rounded,
-                        size: 16,
-                        color: JuselColors.mutedForeground,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        batch.note!,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    _formatDate(batch.createdAt),
+                    style: JuselTextStyles.bodySmall.copyWith(
+                      color: JuselColors.mutedForeground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: JuselSpacing.s16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _MetricColumn(
+                    label: 'Produced',
+                    value: '+${batch.quantityProduced} units',
+                  ),
+                  _MetricColumn(
+                    label: 'Total Cost',
+                    value: 'GHS ${batch.totalCost.toStringAsFixed(2)}',
+                  ),
+                  _MetricColumn(
+                    label: 'Unit Cost',
+                    value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: JuselSpacing.s16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE9F8EF),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      productName,
+                      style: JuselTextStyles.bodySmall.copyWith(
+                        color: const Color(0xFF16A34A),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (batch.notes?.isNotEmpty == true) ...[
+                    const SizedBox(width: JuselSpacing.s12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.note_outlined,
+                          size: 16,
+                          color: JuselColors.mutedForeground,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          batch.notes ?? '',
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -595,36 +783,6 @@ class _MetricColumn extends StatelessWidget {
       ],
     );
   }
-}
-
-class _ProductSummary {
-  final String name;
-  final int currentStock;
-
-  const _ProductSummary({
-    required this.name,
-    required this.currentStock,
-  });
-}
-
-class _BatchSummary {
-  final int id;
-  final int producedUnits;
-  final double totalCost;
-  final double unitCost;
-  final DateTime date;
-  final String tag;
-  final String? note;
-
-  const _BatchSummary({
-    required this.id,
-    required this.producedUnits,
-    required this.totalCost,
-    required this.unitCost,
-    required this.date,
-    required this.tag,
-    this.note,
-  });
 }
 
 enum DateFilter { all, last7, last30 }

@@ -1,10 +1,20 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:jusel_app/features/dashboard/view/apprentice_dashboard.dart';
+import 'package:jusel_app/features/dashboard/view/boss_dashboard.dart';
 import 'package:jusel_app/features/sales/models/cart_item.dart';
+import 'package:jusel_app/features/sales/providers/cart_provider.dart';
+import 'package:jusel_app/features/sales/view/sales_screen.dart';
 
-class SalesCompletedScreen extends StatelessWidget {
+class SalesCompletedScreen extends ConsumerStatefulWidget {
   final List<CartItem> items;
   final double subtotal;
   final String sellerName;
@@ -20,8 +30,8 @@ class SalesCompletedScreen extends StatelessWidget {
     required this.paymentMethod,
     String? receiptNumber,
     DateTime? dateTime,
-  }) : receiptNumber = receiptNumber ?? _generateReceipt(),
-       dateTime = dateTime ?? DateTime.now();
+  })  : receiptNumber = receiptNumber ?? _generateReceipt(),
+        dateTime = dateTime ?? DateTime.now();
 
   static String _generateReceipt() {
     final rand = Random();
@@ -30,9 +40,20 @@ class SalesCompletedScreen extends StatelessWidget {
   }
 
   @override
+  ConsumerState<SalesCompletedScreen> createState() =>
+      _SalesCompletedScreenState();
+}
+
+class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
+  bool _printing = false;
+  bool _sharing = false;
+
+  String get _receiptNumber => widget.receiptNumber ?? '';
+  double get _tax => 0.0; // placeholder
+  double get _total => widget.subtotal + _tax;
+
+  @override
   Widget build(BuildContext context) {
-    final total = subtotal; // tax is 0% in mock
-    final tax = 0.0;
     return Scaffold(
       backgroundColor: JuselColors.background,
       body: SafeArea(
@@ -67,26 +88,32 @@ class SalesCompletedScreen extends StatelessWidget {
               ),
               const SizedBox(height: JuselSpacing.s16),
               _ReceiptCard(
-                receiptNumber: receiptNumber ?? '',
-                dateTime: dateTime,
-                sellerName: sellerName,
-                paymentMethod: paymentMethod,
-                items: items,
-                subtotal: subtotal,
-                tax: tax,
-                total: total,
+                receiptNumber: _receiptNumber,
+                dateTime: widget.dateTime,
+                sellerName: widget.sellerName,
+                paymentMethod: widget.paymentMethod,
+                items: widget.items,
+                subtotal: widget.subtotal,
+                tax: _tax,
+                total: _total,
               ),
               const SizedBox(height: JuselSpacing.s12),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: _printing ? null : _handlePrint,
                       icon: const Icon(Icons.print_outlined),
-                      label: const Text(
-                        'Print',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                      label: _printing
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Print',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           vertical: JuselSpacing.s12,
@@ -103,12 +130,18 @@ class SalesCompletedScreen extends StatelessWidget {
                   const SizedBox(width: JuselSpacing.s12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: _sharing ? null : _handleShare,
                       icon: const Icon(Icons.share_outlined),
-                      label: const Text(
-                        'Share',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                      label: _sharing
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Share',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           vertical: JuselSpacing.s12,
@@ -125,13 +158,17 @@ class SalesCompletedScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: JuselSpacing.s12),
-              const _BossInsights(),
+              _BossInsights(total: _total),
               const SizedBox(height: JuselSpacing.s16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    ref.read(cartProvider.notifier).clearCart();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const SalesScreen()),
+                      (route) => route.isFirst,
+                    );
                   },
                   icon: const Icon(Icons.add_circle_outline),
                   label: const Text(
@@ -155,7 +192,16 @@ class SalesCompletedScreen extends StatelessWidget {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    final user = ref.read(authViewModelProvider).valueOrNull;
+                    final isBoss = user?.role == 'boss';
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => isBoss
+                            ? const BossDashboard()
+                            : const ApprenticeDashboard(),
+                      ),
+                      (route) => route.isFirst,
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
@@ -182,6 +228,129 @@ class SalesCompletedScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handlePrint() async {
+    setState(() => _printing = true);
+    try {
+      final doc = pw.Document();
+      doc.addPage(
+        pw.Page(
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Receipt $_receiptNumber',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                  )),
+              pw.SizedBox(height: 8),
+              pw.Text('Date: ${widget.dateTime}'),
+              pw.Text('Seller: ${widget.sellerName}'),
+              pw.Text('Payment: ${widget.paymentMethod}'),
+              pw.SizedBox(height: 12),
+              pw.Text('Items', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 6),
+              ...widget.items.map(
+                (item) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(item.productName),
+                        pw.Text('GHS ${item.total.toStringAsFixed(2)}'),
+                      ],
+                    ),
+                    pw.Text(
+                      '${item.quantity} x GHS ${item.effectivePrice.toStringAsFixed(2)}',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                    pw.SizedBox(height: 4),
+                  ],
+                ),
+              ),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Subtotal'),
+                  pw.Text('GHS ${widget.subtotal.toStringAsFixed(2)}'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Tax'),
+                  pw.Text('GHS ${_tax.toStringAsFixed(2)}'),
+                ],
+              ),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text('GHS ${_total.toStringAsFixed(2)}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      final Uint8List data = await doc.save();
+      await Printing.layoutPdf(onLayout: (_) async => data);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to print: $e'),
+            backgroundColor: JuselColors.destructive,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Future<void> _handleShare() async {
+    setState(() => _sharing = true);
+    try {
+      final receipt = _buildReceiptText();
+      await Share.share(receipt, subject: 'Receipt $_receiptNumber');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share: $e'),
+            backgroundColor: JuselColors.destructive,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  String _buildReceiptText() {
+    final buffer = StringBuffer();
+    buffer.writeln('Receipt $_receiptNumber');
+    buffer.writeln('Date: ${widget.dateTime}');
+    buffer.writeln('Seller: ${widget.sellerName}');
+    buffer.writeln('Payment: ${widget.paymentMethod}');
+    buffer.writeln('');
+    buffer.writeln('Items:');
+    for (final item in widget.items) {
+      buffer.writeln(
+          '- ${item.productName} x${item.quantity} @ GHS ${item.effectivePrice.toStringAsFixed(2)} = GHS ${item.total.toStringAsFixed(2)}');
+    }
+    buffer.writeln('');
+    buffer.writeln('Subtotal: GHS ${widget.subtotal.toStringAsFixed(2)}');
+    buffer.writeln('Tax: GHS ${_tax.toStringAsFixed(2)}');
+    buffer.writeln('Total: GHS ${_total.toStringAsFixed(2)}');
+    return buffer.toString();
   }
 }
 
@@ -437,7 +606,8 @@ class _MoneyRow extends StatelessWidget {
 }
 
 class _BossInsights extends StatelessWidget {
-  const _BossInsights();
+  final double total;
+  const _BossInsights({required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -483,14 +653,14 @@ class _BossInsights extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Total Cost',
+                'Total Amount',
                 style: JuselTextStyles.bodySmall.copyWith(
                   color: JuselColors.mutedForeground,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'GHS 8.20',
+                'GHS ${total.toStringAsFixed(2)}',
                 style: JuselTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -509,7 +679,7 @@ class _BossInsights extends StatelessWidget {
                 ),
               ),
               Text(
-                '+GHS 6.30',
+                'N/A',
                 style: JuselTextStyles.bodyMedium.copyWith(
                   fontWeight: FontWeight.w800,
                   color: JuselColors.success,

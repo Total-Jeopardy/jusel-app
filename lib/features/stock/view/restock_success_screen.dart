@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/stock/view/stock_history_screen.dart';
+import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
 class RestockSuccessScreen extends StatelessWidget {
+  final String productId;
   final String productName;
   final String category;
   final String? imageAsset;
@@ -15,6 +17,7 @@ class RestockSuccessScreen extends StatelessWidget {
 
   const RestockSuccessScreen({
     super.key,
+    required this.productId,
     required this.productName,
     required this.category,
     this.imageAsset,
@@ -51,7 +54,15 @@ class RestockSuccessScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            StockDetailScreen(productId: productId),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: JuselColors.primary,
                     foregroundColor: JuselColors.primaryForeground,
@@ -77,6 +88,7 @@ class RestockSuccessScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => StockHistoryScreen(
+                          productId: productId,
                           productName: productName,
                           currentStock: newTotalStock,
                           imageAsset: imageAsset,

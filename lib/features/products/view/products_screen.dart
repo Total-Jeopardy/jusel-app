@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/core/utils/product_constants.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 import 'package:jusel_app/features/products/view/add_product_screen.dart';
@@ -41,12 +41,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       final products = await db.productsDao.getAllProducts();
       final stockMap = await inventory.getAllCurrentStock();
       final mapped = products.map((p) {
-        final stock = stockMap[p.id] ?? p.currentStockQty ?? 0;
+        final stock = stockMap[p.id] ?? p.currentStockQty;
         final status = _statusFromStock(stock);
         return _Product(
           id: p.id,
           name: p.name,
           category: p.category,
+          subcategory: p.subcategory,
+          isProduced: p.isProduced,
           price: p.currentSellingPrice,
           cost: p.currentCostPrice,
           status: status,
@@ -112,10 +114,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(
+        onPressed: () async {
+          final result = await Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const AddProductScreen()));
+          ).push<bool>(MaterialPageRoute(builder: (_) => const AddProductScreen()));
+          // Refresh products list if a product was successfully added
+          if (result == true) {
+            _loadProducts();
+          }
         },
         backgroundColor: JuselColors.primary,
         child: const Icon(Icons.add),
@@ -192,9 +198,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           p.category.toLowerCase().contains(query);
       final matchesFilter = switch (_filter) {
         ProductFilter.all => true,
-        ProductFilter.drinks => p.category.toLowerCase().contains('drink'),
-        ProductFilter.localDrinks => p.category.toLowerCase() == 'local drink',
-        ProductFilter.snacks => p.category.toLowerCase() == 'snacks',
+        ProductFilter.drinks => p.category == ProductCategories.drink,
+        ProductFilter.localDrinks =>
+            p.category == ProductCategories.drink &&
+            (p.subcategory == ProductSubcategories.localDrink ||
+                p.subcategory == ProductSubcategories.juice),
+        ProductFilter.snacks => p.category == ProductCategories.snack,
       };
       return matchesQuery && matchesFilter;
     }).toList();
@@ -238,6 +247,10 @@ class _FilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final drinkLabel = ProductHelpers.categoryToDisplay(ProductCategories.drink);
+    final snackLabel = ProductHelpers.categoryToDisplay(ProductCategories.snack);
+    final localDrinkLabel =
+        ProductHelpers.subcategoryToDisplay(ProductSubcategories.localDrink);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -249,17 +262,17 @@ class _FilterChips extends StatelessWidget {
                     onTap: () => onSelected(ProductFilter.all),
                   ),
                   _Chip(
-                    label: 'Drinks',
+                    label: drinkLabel,
                     active: selected == ProductFilter.drinks,
                     onTap: () => onSelected(ProductFilter.drinks),
                   ),
                   _Chip(
-                    label: 'Local Drinks',
+                    label: localDrinkLabel,
                     active: selected == ProductFilter.localDrinks,
                     onTap: () => onSelected(ProductFilter.localDrinks),
                   ),
                   _Chip(
-                    label: 'Snacks',
+                    label: snackLabel,
                     active: selected == ProductFilter.snacks,
                     onTap: () => onSelected(ProductFilter.snacks),
                   ),
@@ -314,40 +327,15 @@ class _ProductTile extends StatelessWidget {
 
   const _ProductTile({required this.product});
 
-  ProductsTableData _toProductsTableData(_Product product) {
-    // Convert ProductStatus enum to string
-    String statusString;
-    switch (product.status) {
-      case ProductStatus.good:
-        statusString = 'active';
-        break;
-      case ProductStatus.low:
-        statusString = 'active';
-        break;
-      case ProductStatus.out:
-        statusString = 'sold_out';
-        break;
-    }
-
-    return ProductsTableData(
-      id: product.id,
-      name: product.name,
-      category: product.category,
-      subcategory: null,
-      isProduced: false,
-      currentSellingPrice: product.price,
-      currentCostPrice: product.cost,
-      currentStockQty: product.statusCount,
-      unitsPerPack: null,
-      status: statusString,
-      createdAt: DateTime.now(),
-      updatedAt: null,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final status = _statusStyle(product.status, product.statusCount);
+    final categoryLabel = ProductHelpers.categoryToDisplay(product.category);
+    final subcategoryLabel = product.subcategory != null
+        ? ProductHelpers.subcategoryToDisplay(product.subcategory!)
+        : null;
+    final categoryDisplay =
+        subcategoryLabel != null ? '$categoryLabel · $subcategoryLabel' : categoryLabel;
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
@@ -358,20 +346,13 @@ class _ProductTile extends StatelessWidget {
               product.status == ProductStatus.out) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => StockDetailScreen(
-                  productId: product.id,
-                  productName: product.name,
-                  category: product.category,
-                  stockUnits: product.statusCount,
-                  unitCost: product.cost,
-                ),
+                builder: (_) => StockDetailScreen(productId: product.id),
               ),
             );
           } else {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) =>
-                    ProductDetailScreen(product: _toProductsTableData(product)),
+                builder: (_) => ProductDetailScreen(productId: product.id),
               ),
             );
           }
@@ -417,7 +398,7 @@ class _ProductTile extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          product.category,
+                          categoryDisplay,
                           style: JuselTextStyles.bodySmall.copyWith(
                             color: JuselColors.mutedForeground,
                           ),
@@ -533,47 +514,12 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _BottomNav extends StatelessWidget {
-  final int currentIndex;
-
-  const _BottomNav({required this.currentIndex});
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationBar(
-      backgroundColor: Colors.white,
-      selectedIndex: currentIndex,
-      onDestinationSelected: (_) {},
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          label: 'Dashboard',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          label: 'Products',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.point_of_sale_outlined),
-          label: 'Sales',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.store_mall_directory_outlined),
-          label: 'Stock',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.receipt_long_outlined),
-          label: 'Reports',
-        ),
-      ],
-    );
-  }
-}
-
 class _Product {
   final String id;
   final String name;
   final String category;
+  final String? subcategory;
+  final bool isProduced;
   final double price;
   final double cost;
   final ProductStatus status;
@@ -583,6 +529,8 @@ class _Product {
     required this.id,
     required this.name,
     required this.category,
+    required this.subcategory,
+    required this.isProduced,
     required this.price,
     required this.cost,
     required this.status,

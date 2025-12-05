@@ -1,10 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
+import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
+final apprenticeLowStockProvider =
+    FutureProvider.autoDispose<List<_LowStockItem>>((ref) async {
+  final inventory = ref.read(inventoryServiceProvider);
+  final products = await inventory.getLowStockProducts();
 
+  final items = await Future.wait(
+    products.map((p) async {
+      final stock = await inventory.getCurrentStock(p.id);
+      return _LowStockItem(product: p, stock: stock);
+    }),
+  );
 
-class ApprenticeDashboard extends StatelessWidget {
+  return items;
+});
+
+class _LowStockItem {
+  final ProductsTableData product;
+  final int stock;
+
+  const _LowStockItem({required this.product, required this.stock});
+}
+
+class ApprenticeDashboard extends ConsumerWidget {
 
   const ApprenticeDashboard({super.key});
 
@@ -12,9 +37,18 @@ class ApprenticeDashboard extends StatelessWidget {
 
   @override
 
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
 
-    return Scaffold(
+    final lowStockAsync = ref.watch(apprenticeLowStockProvider);
+
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          safePop(context, fallbackRoute: '/apprentice-dashboard');
+        }
+      },
+      child: Scaffold(
 
       backgroundColor: JuselColors.background,
 
@@ -148,7 +182,7 @@ class ApprenticeDashboard extends StatelessWidget {
 
               const SizedBox(height: JuselSpacing.s20),
 
-              _AlertCard(),
+              _AlertCard(lowStockAsync: lowStockAsync),
 
               const SizedBox(height: JuselSpacing.s20),
 
@@ -176,6 +210,7 @@ class ApprenticeDashboard extends StatelessWidget {
 
       ),
 
+    ),
     );
 
   }
@@ -185,65 +220,123 @@ class ApprenticeDashboard extends StatelessWidget {
 
 
 class _AlertCard extends StatelessWidget {
+  final AsyncValue<List<_LowStockItem>> lowStockAsync;
+
+  const _AlertCard({required this.lowStockAsync});
 
   @override
 
   Widget build(BuildContext context) {
 
-    return Container(
+    const alertColor = Color(0xFFB45309);
 
-      width: double.infinity,
-
-      padding: const EdgeInsets.symmetric(
-
-        horizontal: JuselSpacing.s16,
-
-        vertical: JuselSpacing.s16,
-
-      ),
-
-      decoration: BoxDecoration(
-
-        color: const Color(0xFFFFF6E9),
-
-        borderRadius: BorderRadius.circular(14),
-
-        border: Border.all(color: const Color(0xFFF2D8A2)),
-
-      ),
-
-      child: Row(
-
-        children: [
-
-          const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309)),
-
-          const SizedBox(width: JuselSpacing.s12),
-
-          Expanded(
-
-            child: Text(
-
-              'Alert: 2 items are running low on stock.',
-
-              style: JuselTextStyles.bodySmall.copyWith(
-
-                color: const Color(0xFF92400E),
-
-                fontWeight: FontWeight.w600,
-
-                fontSize: 13,
-
-              ),
-
-            ),
-
+    return lowStockAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(JuselSpacing.s12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF6E9),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF2D8A2)),
+        ),
+        child: Text(
+          'Failed to load alerts: $e',
+          style: JuselTextStyles.bodySmall.copyWith(
+            color: JuselColors.destructive,
+            fontWeight: FontWeight.w700,
           ),
-
-        ],
-
+        ),
       ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(JuselSpacing.s12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: JuselColors.border),
+            ),
+            child: Text(
+              'No low stock alerts.',
+              style: JuselTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                color: JuselColors.mutedForeground,
+              ),
+            ),
+          );
+        }
 
+        return Column(
+          children: items
+              .map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: JuselSpacing.s8),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                StockDetailScreen(productId: item.product.id),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: JuselSpacing.s16,
+                          vertical: JuselSpacing.s16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF6E9),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFF2D8A2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                color: alertColor),
+                            const SizedBox(width: JuselSpacing.s12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Low stock: ${item.product.name}',
+                                    style:
+                                        JuselTextStyles.bodyMedium.copyWith(
+                                      color: alertColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Only ${item.stock} units remaining.',
+                                    style: JuselTextStyles.bodySmall.copyWith(
+                                      color: const Color(0xFF92400E),
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: alertColor),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
 
   }
@@ -1185,4 +1278,3 @@ class _BottomNav extends StatelessWidget {
   }
 
 }
-

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/ui/components/quick_action_card.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
@@ -9,6 +11,7 @@ import 'package:jusel_app/features/products/view/products_screen.dart';
 import 'package:jusel_app/features/sales/view/sales_screen.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
+import 'package:jusel_app/core/database/app_database.dart';
 
 class BossDashboard extends StatefulWidget {
   const BossDashboard({super.key});
@@ -43,33 +46,42 @@ class _BossDashboardState extends State<BossDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: IndexedStack(index: _currentIndex, children: _pages),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => _setTab(i),
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_2_outlined),
-            label: 'Products',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.point_of_sale),
-            label: 'Sales',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory), label: 'Stock'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_outlined),
-            label: 'Reports',
-          ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          safePop(context, fallbackRoute: '/boss-dashboard');
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: IndexedStack(index: _currentIndex, children: _pages),
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) => _setTab(i),
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              label: 'Products',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.point_of_sale),
+              label: 'Sales',
+            ),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.inventory), label: 'Stock'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_outlined),
+              label: 'Reports',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -99,6 +111,7 @@ class DashboardHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final metricsAsync = ref.watch(dashboardProvider);
+    final lowStockAsync = ref.watch(lowStockProvider);
 
     return Center(
       child: ConstrainedBox(
@@ -123,7 +136,7 @@ class DashboardHome extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _OverviewGrid(metrics: metrics),
                 const SizedBox(height: 20),
-                const _AlertsCard(),
+                _AlertsCard(lowStockAsync: lowStockAsync),
                 const SizedBox(height: 16),
                 _TrendCard(values: metrics.trendValues),
                 const SizedBox(height: 16),
@@ -135,6 +148,28 @@ class DashboardHome extends ConsumerWidget {
       ),
     );
   }
+}
+
+final lowStockProvider =
+    FutureProvider.autoDispose<List<_LowStockItem>>((ref) async {
+  final inventory = ref.read(inventoryServiceProvider);
+  final products = await inventory.getLowStockProducts();
+
+  final items = await Future.wait(
+    products.map((p) async {
+      final stock = await inventory.getCurrentStock(p.id);
+      return _LowStockItem(product: p, stock: stock);
+    }),
+  );
+
+  return items;
+});
+
+class _LowStockItem {
+  final ProductsTableData product;
+  final int stock;
+
+  const _LowStockItem({required this.product, required this.stock});
 }
 
 // Define _Header, _QuickActions, _OverviewGrid, _AlertsCard, _TrendCard, _TopProductsCard,
@@ -234,8 +269,8 @@ class _QuickActions extends StatelessWidget {
                 label: 'Sale',
                 onTap: () => onNavigateToTab(2),
                 gradientColors: [
-                  const Color(0xFF1F6BFF).withOpacity(0.16),
-                  const Color(0xFF1F6BFF).withOpacity(0.08),
+                  const Color(0xFF1F6BFF).withValues(alpha: 0.16),
+                  const Color(0xFF1F6BFF).withValues(alpha: 0.08),
                 ],
                 iconColor: const Color(0xFF1F6BFF),
               ),
@@ -245,8 +280,8 @@ class _QuickActions extends StatelessWidget {
                 label: 'Restock',
                 onTap: () => onNavigateToTab(3),
                 gradientColors: [
-                  const Color(0xFF22D3EE).withOpacity(0.16),
-                  const Color(0xFF34D399).withOpacity(0.10),
+                  const Color(0xFF22D3EE).withValues(alpha: 0.16),
+                  const Color(0xFF34D399).withValues(alpha: 0.10),
                 ],
                 iconColor: const Color(0xFF0EA5E9),
               ),
@@ -259,8 +294,8 @@ class _QuickActions extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const BatchScreen()),
                 ),
                 gradientColors: [
-                  const Color(0xFF7C5CFF).withOpacity(0.16),
-                  const Color(0xFF38BDF8).withOpacity(0.10),
+                  const Color(0xFF7C5CFF).withValues(alpha: 0.16),
+                  const Color(0xFF38BDF8).withValues(alpha: 0.10),
                 ],
                 iconColor: const Color(0xFF7C5CFF),
               ),
@@ -270,8 +305,8 @@ class _QuickActions extends StatelessWidget {
                 label: 'Product',
                 onTap: () => onNavigateToTab(1),
                 gradientColors: [
-                  const Color(0xFF94A3B8).withOpacity(0.18),
-                  const Color(0xFFE2E8F0).withOpacity(0.12),
+                  const Color(0xFF94A3B8).withValues(alpha: 0.18),
+                  const Color(0xFFE2E8F0).withValues(alpha: 0.12),
                 ],
                 iconColor: const Color(0xFF0F172A),
               ),
@@ -295,7 +330,7 @@ class _QuickActions extends StatelessWidget {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: JuselColors.primary.withOpacity(0.28),
+                  color: JuselColors.primary.withValues(alpha: 0.28),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -471,7 +506,7 @@ class _OverviewItem extends StatelessWidget {
         color: background ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: JuselColors.border.withOpacity(0.9),
+          color: JuselColors.border.withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),
@@ -539,7 +574,8 @@ class _OverviewItem extends StatelessWidget {
 }
 
 class _AlertsCard extends StatelessWidget {
-  const _AlertsCard();
+  final AsyncValue<List<_LowStockItem>> lowStockAsync;
+  const _AlertsCard({required this.lowStockAsync});
 
   @override
   Widget build(BuildContext context) {
@@ -554,59 +590,102 @@ class _AlertsCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: JuselSpacing.s8),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const StockDetailScreen(
-                  productId: 'prod_cola',
-                  productName: 'Cola 500ml',
-                  category: 'Beverages',
-                  stockUnits: 4,
-                  unitCost: 0.85,
-                ),
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(JuselSpacing.s16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4D6),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFFDE68A)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: alertColor),
-                  const SizedBox(width: JuselSpacing.s12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Low stock: Cola 500ml',
-                          style: JuselTextStyles.bodyMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: alertColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Only 4 units remaining. Restock advised.',
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: alertColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: alertColor),
-                ],
-              ),
+        lowStockAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(
+            'Failed to load alerts: $e',
+            style: JuselTextStyles.bodySmall.copyWith(
+              color: JuselColors.destructive,
+              fontWeight: FontWeight.w700,
             ),
           ),
+          data: (items) {
+            if (items.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(JuselSpacing.s12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: JuselColors.border),
+                ),
+                child: Text(
+                  'No low stock alerts.',
+                  style: JuselTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: JuselColors.mutedForeground,
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              children: items
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: JuselSpacing.s8),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => StockDetailScreen(
+                                productId: item.product.id,
+                              ),
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(JuselSpacing.s16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF4D6),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFFFDE68A),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded,
+                                    color: alertColor),
+                                const SizedBox(width: JuselSpacing.s12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Low stock: ${item.product.name}',
+                                        style: JuselTextStyles.bodyMedium
+                                            .copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: alertColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Only ${item.stock} units remaining. Restock advised.',
+                                        style: JuselTextStyles.bodySmall
+                                            .copyWith(
+                                          color: alertColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right,
+                                    color: alertColor),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
         ),
       ],
     );
@@ -625,7 +704,7 @@ class _TrendCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: JuselColors.border.withOpacity(0.9),
+          color: JuselColors.border.withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),
@@ -670,7 +749,7 @@ class _SalesTrendPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final bgPaint = Paint()
-      ..color = JuselColors.primary.withOpacity(0.08)
+      ..color = JuselColors.primary.withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
 
     final linePaint = Paint()
@@ -738,7 +817,7 @@ class _TopProductsCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: JuselColors.border.withOpacity(0.9),
+            color: JuselColors.border.withValues(alpha: 0.9),
             width: 0.5,
           ),
         ),
@@ -776,7 +855,7 @@ class _TopProductsCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: JuselColors.border.withOpacity(0.9),
+          color: JuselColors.border.withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),

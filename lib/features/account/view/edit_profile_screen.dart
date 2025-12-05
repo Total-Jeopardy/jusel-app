@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Edit Profile',

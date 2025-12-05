@@ -1,25 +1,63 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/production/view/batch_screen.dart';
+import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
+import 'package:jusel_app/features/stock/view/stock_history_screen.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 
-class StockDetailScreen extends StatelessWidget {
-  final String? productId;
-  final String productName;
-  final String category;
-  final int stockUnits;
-  final double unitCost;
+/// Fetch a single product, its current stock, and recent movements.
+final stockDetailProvider = FutureProvider.autoDispose
+    .family<_StockDetailData, String>((ref, productId) async {
+      final db = ref.read(appDatabaseProvider);
+      final inventory = ref.read(inventoryServiceProvider);
+      final product = await db.productsDao.getProduct(productId);
+      if (product == null) {
+        throw StateError('Product not found');
+      }
+      final stock = await inventory.getCurrentStock(productId);
+      final movements = await db.stockMovementsDao.getMovementsForProduct(
+        productId,
+      );
 
-  const StockDetailScreen({
-    super.key,
-    this.productId,
-    required this.productName,
-    required this.category,
-    required this.stockUnits,
-    required this.unitCost,
-  });
+      final trendPoints = _buildTrend(movements, stock);
+
+      return _StockDetailData(
+        product: product,
+        stockUnits: stock,
+        recentMovements: movements.take(5).toList(),
+        trend: trendPoints,
+      );
+    });
+
+String _stockStatus(int stock) {
+  if (stock <= 0) return 'Out of Stock';
+  if (stock <= 10) return 'Low Stock';
+  return 'In Stock';
+}
+
+int _reorderSuggestion(int stock) {
+  // Simple heuristic: aim for 50 units; never suggest negative.
+  final target = 50;
+  return ((target - stock).clamp(10, target)).toInt();
+}
+
+class StockDetailScreen extends ConsumerWidget {
+  final String productId;
+
+  const StockDetailScreen({super.key, required this.productId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detail = ref.watch(stockDetailProvider(productId));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F9FF),
       appBar: AppBar(
@@ -31,69 +69,205 @@ class StockDetailScreen extends StatelessWidget {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _HeaderCard(
-                category: category,
-                productName: productName,
-                stockUnits: stockUnits,
-                unitCost: unitCost,
+      body: detail.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(JuselSpacing.s16),
+            child: Text(
+              'Failed to load stock detail: $e',
+              style: JuselTextStyles.bodyMedium.copyWith(
+                color: JuselColors.destructive,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: JuselSpacing.s16),
-              const _AlertCard(),
-              const SizedBox(height: JuselSpacing.s16),
-              const _TrendCard(),
-              const SizedBox(height: JuselSpacing.s16),
-              const _RecentActivity(),
-              const SizedBox(height: JuselSpacing.s16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RestockScreen(
-                        productId: productId,
-                        productName: productName,
-                        category: category,
-                        currentStock: stockUnits,
-                      ),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: JuselColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: JuselSpacing.s16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Restock Product',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              _GhostButton(label: 'Add to Purchase List', onTap: () {}),
-              const SizedBox(height: JuselSpacing.s12),
-              _LinkTile(label: 'View Production Batches', onTap: () {}),
-              _LinkTile(label: 'View All Movements', onTap: () {}),
-              _LinkTile(label: 'View Product Details', onTap: () {}),
-            ],
+            ),
           ),
         ),
+        data: (data) {
+          final product = data.product;
+          final stockUnits = data.stockUnits;
+          final statusLabel = _stockStatus(stockUnits);
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeaderCard(
+                    category: product.category,
+                    productName: product.name,
+                    stockUnits: stockUnits,
+                    unitCost: product.currentCostPrice,
+                    statusLabel: statusLabel,
+                  ),
+                  const SizedBox(height: JuselSpacing.s16),
+                  _AlertCard(
+                    stockUnits: stockUnits,
+                    reorderSuggestion: _reorderSuggestion(stockUnits),
+                  ),
+                  const SizedBox(height: JuselSpacing.s16),
+                  _TrendCard(points: data.trend),
+                  const SizedBox(height: JuselSpacing.s16),
+                  _RecentActivity(movements: data.recentMovements),
+                  const SizedBox(height: JuselSpacing.s16),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => RestockScreen(
+                            productId: product.id,
+                            productName: product.name,
+                            category: product.category,
+                            currentStock: stockUnits,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: JuselColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: JuselSpacing.s16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Restock Product',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: JuselSpacing.s12),
+                  _GhostButton(
+                    label: 'Add to Purchase List',
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Purchase list is coming soon.'),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: JuselSpacing.s12),
+                  _LinkTile(
+                    label: 'View Production Batches',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BatchScreen(productId: product.id),
+                        ),
+                      );
+                    },
+                  ),
+                  _LinkTile(
+                    label: 'View All Movements',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StockHistoryScreen(
+                            productId: product.id,
+                            productName: product.name,
+                            currentStock: stockUnits,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _LinkTile(
+                    label: 'View Product Details',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ProductDetailScreen(productId: product.id),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
+}
+
+class _StockDetailData {
+  final ProductsTableData product;
+  final int stockUnits;
+  final List<StockMovementsTableData> recentMovements;
+  final List<_TrendPoint> trend;
+
+  const _StockDetailData({
+    required this.product,
+    required this.stockUnits,
+    required this.recentMovements,
+    required this.trend,
+  });
+}
+
+class _TrendPoint {
+  final DateTime date;
+  final int stock;
+
+  const _TrendPoint({required this.date, required this.stock});
+}
+
+List<_TrendPoint> _buildTrend(
+  List<StockMovementsTableData> movements,
+  int currentStock,
+) {
+  final now = DateTime.now();
+  final start = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(const Duration(days: 6));
+
+  final recent = movements.where((m) => !m.createdAt.isBefore(start));
+
+  if (recent.isEmpty) return [];
+
+  final Map<DateTime, int> deltaByDay = {};
+  for (final m in recent) {
+    final day = DateTime(m.createdAt.year, m.createdAt.month, m.createdAt.day);
+    final delta = _movementDelta(m);
+    deltaByDay[day] = (deltaByDay[day] ?? 0) + delta;
+  }
+
+  final totalDelta = deltaByDay.values.fold<int>(0, (p, c) => p + c);
+  final baseStock = currentStock - totalDelta;
+
+  final List<_TrendPoint> points = [];
+  var running = baseStock;
+  for (var i = 0; i < 7; i++) {
+    final day = start.add(Duration(days: i));
+    running += deltaByDay[day] ?? 0;
+    points.add(_TrendPoint(date: day, stock: running));
+  }
+
+  return points;
+}
+
+int _movementDelta(StockMovementsTableData m) {
+  final type = m.type.toLowerCase();
+  if (type == 'sale' || type == 'stock_out') {
+    return -m.quantityUnits;
+  }
+  return m.quantityUnits;
 }
 
 class _HeaderCard extends StatelessWidget {
@@ -101,12 +275,14 @@ class _HeaderCard extends StatelessWidget {
   final String productName;
   final int stockUnits;
   final double unitCost;
+  final String statusLabel;
 
   const _HeaderCard({
     required this.category,
     required this.productName,
     required this.stockUnits,
     required this.unitCost,
+    required this.statusLabel,
   });
 
   @override
@@ -119,7 +295,7 @@ class _HeaderCard extends StatelessWidget {
         border: Border.all(color: JuselColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
@@ -158,7 +334,7 @@ class _HeaderCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'Low Stock',
+                  statusLabel,
                   style: JuselTextStyles.bodySmall.copyWith(
                     color: const Color(0xFFB45309),
                     fontWeight: FontWeight.w800,
@@ -210,7 +386,10 @@ class _HeaderCard extends StatelessWidget {
 }
 
 class _AlertCard extends StatelessWidget {
-  const _AlertCard();
+  final int stockUnits;
+  final int reorderSuggestion;
+
+  const _AlertCard({required this.stockUnits, required this.reorderSuggestion});
 
   @override
   Widget build(BuildContext context) {
@@ -230,7 +409,9 @@ class _AlertCard extends StatelessWidget {
               const SizedBox(width: JuselSpacing.s8),
               Expanded(
                 child: Text(
-                  'Stock level is below the minimum threshold of 10 units.',
+                  stockUnits <= 10
+                      ? 'Stock level is below the minimum threshold of 10 units.'
+                      : 'Stock level is above the minimum threshold.',
                   style: JuselTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFFB45309),
@@ -240,13 +421,14 @@ class _AlertCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: JuselSpacing.s6),
-          Text(
-            'Recommended reorder: 50 units',
-            style: JuselTextStyles.bodySmall.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFFB45309),
+          if (stockUnits <= 10)
+            Text(
+              'Recommended reorder: $reorderSuggestion units',
+              style: JuselTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFFB45309),
+              ),
             ),
-          ),
           const SizedBox(height: JuselSpacing.s12),
           Row(
             children: [
@@ -260,9 +442,9 @@ class _AlertCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: JuselSpacing.s6),
-              const Text(
-                '~2.5 days',
-                style: TextStyle(
+              Text(
+                _daysRemaining(stockUnits),
+                style: const TextStyle(
                   color: Color(0xFFB45309),
                   fontWeight: FontWeight.w900,
                 ),
@@ -273,13 +455,57 @@ class _AlertCard extends StatelessWidget {
       ),
     );
   }
+
+  String _daysRemaining(int stock) {
+    if (stock <= 0) return '<1 day';
+    // Very rough heuristic; replace with real consumption data when available.
+    final days = (stock / 4).clamp(0, 30); // assume ~4 units/day usage
+    return '~${days.toStringAsFixed(1)} days';
+  }
 }
 
 class _TrendCard extends StatelessWidget {
-  const _TrendCard();
+  final List<_TrendPoint> points;
+  const _TrendCard({required this.points});
 
   @override
   Widget build(BuildContext context) {
+    if (points.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Stock Trend (Last 7 Days)',
+            style: JuselTextStyles.bodySmall.copyWith(
+              fontWeight: FontWeight.w700,
+              color: JuselColors.foreground,
+            ),
+          ),
+          const SizedBox(height: JuselSpacing.s8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(JuselSpacing.s12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: JuselColors.border),
+            ),
+            child: Text(
+              'No movements in the last 7 days.',
+              style: JuselTextStyles.bodySmall.copyWith(
+                color: JuselColors.mutedForeground,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final maxStock = points.map((p) => p.stock).reduce(math.max).toDouble();
+    final minStock = points.map((p) => p.stock).reduce(math.min).toDouble();
+    final yRange = (maxStock - minStock).abs() < 1 ? 1.0 : maxStock - minStock;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -300,7 +526,13 @@ class _TrendCard extends StatelessWidget {
           ),
           child: SizedBox(
             height: 120,
-            child: CustomPaint(painter: _TrendPainter()),
+            child: CustomPaint(
+              painter: _TrendPainter(
+                points: points,
+                minY: minStock,
+                rangeY: yRange,
+              ),
+            ),
           ),
         ),
       ],
@@ -309,6 +541,16 @@ class _TrendCard extends StatelessWidget {
 }
 
 class _TrendPainter extends CustomPainter {
+  final List<_TrendPoint> points;
+  final double minY;
+  final double rangeY;
+
+  _TrendPainter({
+    required this.points,
+    required this.minY,
+    required this.rangeY,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -317,20 +559,32 @@ class _TrendPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final points = [
-      Offset(10, size.height * 0.8),
-      Offset(size.width * 0.25, size.height * 0.5),
-      Offset(size.width * 0.45, size.height * 0.55),
-      Offset(size.width * 0.65, size.height * 0.4),
-      Offset(size.width * 0.78, size.height * 0.6),
-      Offset(size.width * 0.9, size.height * 0.45),
-    ];
+    if (points.isEmpty) return;
 
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    double dxForIndex(int i) {
+      if (points.length == 1) return size.width / 2;
+      final step = size.width / (points.length - 1);
+      return step * i;
+    }
+
+    double dyForValue(int i) {
+      final val = points[i].stock.toDouble();
+      final normalized = (val - minY) / rangeY;
+      return size.height - (normalized * size.height);
+    }
+
+    final path = Path()..moveTo(dxForIndex(0), dyForValue(0));
     for (var i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
+      path.lineTo(dxForIndex(i), dyForValue(i));
     }
     canvas.drawPath(path, paint);
+
+    final dotPaint = Paint()
+      ..color = const Color(0xFFFFA500)
+      ..style = PaintingStyle.fill;
+    for (var i = 0; i < points.length; i++) {
+      canvas.drawCircle(Offset(dxForIndex(i), dyForValue(i)), 3, dotPaint);
+    }
   }
 
   @override
@@ -338,16 +592,52 @@ class _TrendPainter extends CustomPainter {
 }
 
 class _RecentActivity extends StatelessWidget {
-  const _RecentActivity();
+  final List<StockMovementsTableData> movements;
+
+  const _RecentActivity({required this.movements});
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      _Activity('Sale #1024', 'Today, 10:30 AM', -2),
-      _Activity('Sale #1021', 'Yesterday, 4:15 PM', -3),
-      _Activity('Manual Adjustment', 'Mon, 9:00 AM', -1),
-      _Activity('Restock', 'Last Week', 20),
-    ];
+    final items = movements
+        .map(
+          (m) => _Activity(
+            _titleForMovement(m),
+            DateFormat('MMM d, h:mm a').format(m.createdAt),
+            m.quantityUnits,
+          ),
+        )
+        .toList();
+    if (items.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recent Activity',
+            style: JuselTextStyles.bodySmall.copyWith(
+              fontWeight: FontWeight.w700,
+              color: JuselColors.foreground,
+            ),
+          ),
+          const SizedBox(height: JuselSpacing.s8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(JuselSpacing.s12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: JuselColors.border),
+            ),
+            child: Text(
+              'No movements recorded yet.',
+              style: JuselTextStyles.bodySmall.copyWith(
+                color: JuselColors.mutedForeground,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -420,6 +710,19 @@ class _RecentActivity extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _titleForMovement(StockMovementsTableData movement) {
+    switch (movement.type) {
+      case 'sale':
+        return 'Sale';
+      case 'stock_in':
+        return 'Restock';
+      case 'stock_out':
+        return 'Adjustment';
+      default:
+        return movement.type;
+    }
   }
 }
 

@@ -25,6 +25,7 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
     required int? unitsPerPack,
     required String createdByUserId,
     required int initialStock,
+    String status = 'active',
   }) async {
     await into(productsTable).insert(
       ProductsTableCompanion.insert(
@@ -36,7 +37,7 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         currentCostPrice: currentCostPrice ?? 0.0,
         currentSellingPrice: sellingPrice,
         unitsPerPack: Value(unitsPerPack),
-        status: const Value('active'),
+        status: Value(status),
         createdAt: DateTime.now(),
       ),
     );

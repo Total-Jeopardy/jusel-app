@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/account/view/change_password_placeholder.dart';
 import 'package:jusel_app/features/account/view/edit_profile_screen.dart';
@@ -10,166 +12,212 @@ import 'package:jusel_app/features/account/view/notifications_settings_screen.da
 import 'package:jusel_app/features/account/view/app_theme_screen.dart';
 import 'package:jusel_app/features/account/view/sync_status_screen.dart';
 import 'package:jusel_app/features/account/view/about_jusel_screen.dart';
-import 'package:jusel_app/features/dashboard/view/apprentice_dashboard.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:jusel_app/features/auth/view/login_screen.dart';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: JuselColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Account',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
-              const SizedBox(height: JuselSpacing.s16),
-              const _ProfileHeader(
-                name: 'Jane Boss',
-                role: 'BOSS',
-                phone: '+1 234 567 890',
-                email: 'jane@jusel.store',
-              ),
-              const SizedBox(height: JuselSpacing.s16),
-              const _SectionList(
-                title: 'Account',
-                children: [
-                  _Tile(
-                    icon: Icons.edit_outlined,
-                    label: 'Edit Profile',
-                    action: _TileAction.editProfile,
-                  ),
-                  _Tile(
-                    icon: Icons.lock_outline,
-                    label: 'Change Password',
-                    action: _TileAction.changePassword,
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s16),
-              const _SectionList(
-                title: 'Business',
-                children: [
-                  _Tile(
-                    icon: Icons.group_outlined,
-                    label: 'Manage Users',
-                    action: _TileAction.manageUsers,
-                  ),
+  ConsumerState<AccountScreen> createState() => _AccountScreenState();
+}
 
-                  _Tile(
-                    icon: Icons.store_mall_directory_outlined,
-                    label: 'Shop Settings',
-                    action: _TileAction.shopSettings,
-                  ),
-                  _Tile(
-                    icon: Icons.warning_amber_outlined,
-                    label: 'Low Stock Threshold',
-                    trailing: Text(
-                      '< 10 units',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: JuselColors.mutedForeground,
-                      ),
+class _AccountScreenState extends ConsumerState<AccountScreen> {
+  bool _loggingOut = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          safePop(context, fallbackRoute: '/boss-dashboard');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: JuselColors.background,
+        appBar: AppBar(
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
+          ),
+          title: const Text(
+            'Account',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          centerTitle: false,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                const SizedBox(height: JuselSpacing.s16),
+                const _ProfileHeader(
+                  name: 'Jane Boss',
+                  role: 'BOSS',
+                  phone: '+1 234 567 890',
+                  email: 'jane@jusel.store',
+                ),
+                const SizedBox(height: JuselSpacing.s16),
+                const _SectionList(
+                  title: 'Account',
+                  children: [
+                    _Tile(
+                      icon: Icons.edit_outlined,
+                      label: 'Edit Profile',
+                      action: _TileAction.editProfile,
                     ),
-                    action: _TileAction.lowStockThreshold,
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              const _SectionList(
-                title: 'App Settings',
-                children: [
-                  _Tile(
-                    icon: Icons.notifications_none_outlined,
-                    label: 'Notifications',
-                    trailing: Text(
-                      'On',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: JuselColors.mutedForeground,
-                      ),
+                    _Tile(
+                      icon: Icons.lock_outline,
+                      label: 'Change Password',
+                      action: _TileAction.changePassword,
                     ),
-                    action: _TileAction.notifications,
-                  ),
-                  _Tile(
-                    icon: Icons.dark_mode_outlined,
-                    label: 'App Theme',
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Light',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: JuselColors.mutedForeground,
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        Icon(
-                          Icons.chevron_right,
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s16),
+                const _SectionList(
+                  title: 'Business',
+                  children: [
+                    _Tile(
+                      icon: Icons.group_outlined,
+                      label: 'Manage Users',
+                      action: _TileAction.manageUsers,
+                    ),
+
+                    _Tile(
+                      icon: Icons.store_mall_directory_outlined,
+                      label: 'Shop Settings',
+                      action: _TileAction.shopSettings,
+                    ),
+                    _Tile(
+                      icon: Icons.warning_amber_outlined,
+                      label: 'Low Stock Threshold',
+                      trailing: Text(
+                        '< 10 units',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
                           color: JuselColors.mutedForeground,
                         ),
-                      ],
+                      ),
+                      action: _TileAction.lowStockThreshold,
                     ),
-                    action: _TileAction.appTheme,
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              const _SectionList(
-                title: 'System',
-                children: [
-                  _Tile(
-                    icon: Icons.sync_outlined,
-                    label: 'Sync Status',
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.circle, size: 10, color: Color(0xFF16A34A)),
-                        SizedBox(width: 6),
-                        Text(
-                          'Online',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                const _SectionList(
+                  title: 'App Settings',
+                  children: [
+                    _Tile(
+                      icon: Icons.notifications_none_outlined,
+                      label: 'Notifications',
+                      trailing: Text(
+                        'On',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.mutedForeground,
+                        ),
+                      ),
+                      action: _TileAction.notifications,
+                    ),
+                    _Tile(
+                      icon: Icons.dark_mode_outlined,
+                      label: 'App Theme',
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Light',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: JuselColors.mutedForeground,
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Icon(
+                            Icons.chevron_right,
+                            color: JuselColors.mutedForeground,
+                          ),
+                        ],
+                      ),
+                      action: _TileAction.appTheme,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                const _SectionList(
+                  title: 'System',
+                  children: [
+                    _Tile(
+                      icon: Icons.sync_outlined,
+                      label: 'Sync Status',
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            size: 10,
                             color: Color(0xFF16A34A),
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 6),
+                          Text(
+                            'Online',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF16A34A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      action: _TileAction.syncStatus,
                     ),
-                    action: _TileAction.syncStatus,
-                  ),
-                  _Tile(
-                    icon: Icons.info_outline,
-                    label: 'About Jusel',
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: JuselColors.mutedForeground,
+                    _Tile(
+                      icon: Icons.info_outline,
+                      label: 'About Jusel',
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: JuselColors.mutedForeground,
+                      ),
+                      action: _TileAction.aboutJusel,
                     ),
-                    action: _TileAction.aboutJusel,
-                  ),
-                ],
-              ),
-              const SizedBox(height: JuselSpacing.s16),
-              _FooterButtons(),
-            ],
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s16),
+                _FooterButtons(
+                  onLogout: _handleLogout,
+                  loggingOut: _loggingOut,
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleLogout() async {
+    setState(() => _loggingOut = true);
+    try {
+      await ref.read(authViewModelProvider.notifier).signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: $e'),
+            backgroundColor: JuselColors.destructive,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
+    }
   }
 }
 
@@ -416,6 +464,11 @@ enum _TileAction {
 }
 
 class _FooterButtons extends StatelessWidget {
+  final VoidCallback onLogout;
+  final bool loggingOut;
+
+  const _FooterButtons({required this.onLogout, required this.loggingOut});
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -447,9 +500,7 @@ class _FooterButtons extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () {
-              // TODO: logout
-            },
+            onPressed: loggingOut ? null : onLogout,
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: JuselColors.destructive),
               shape: RoundedRectangleBorder(
@@ -458,13 +509,24 @@ class _FooterButtons extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: JuselSpacing.s12),
               backgroundColor: Colors.white,
             ),
-            child: const Text(
-              'Log Out',
-              style: TextStyle(
-                color: JuselColors.destructive,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            child: loggingOut
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        JuselColors.destructive,
+                      ),
+                    ),
+                  )
+                : const Text(
+                    'Log Out',
+                    style: TextStyle(
+                      color: JuselColors.destructive,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: JuselSpacing.s12),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jusel_app/core/ui/components/success_overlay.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 class ChangePasswordPlaceholderScreen extends StatefulWidget {
@@ -53,7 +54,7 @@ class _ChangePasswordPlaceholderScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Change Password',

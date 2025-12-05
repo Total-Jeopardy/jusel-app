@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 class LowStockThresholdScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Low Stock Threshold',

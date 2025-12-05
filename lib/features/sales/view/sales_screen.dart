@@ -2,12 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/sales/models/cart_item.dart';
 import 'package:jusel_app/features/sales/providers/cart_provider.dart';
 import 'package:jusel_app/features/sales/view/cart_view.dart';
 import 'package:jusel_app/features/sales/view/product_selection_modal.dart';
 import 'package:jusel_app/features/products/view/product_detail_screen.dart';
+
+final _activeProductsWithStockProvider = FutureProvider.autoDispose<
+    List<_ProductWithStock>>((ref) async {
+  final db = ref.read(appDatabaseProvider);
+  final inventory = ref.read(inventoryServiceProvider);
+
+  final products = await db.productsDao.getAllProducts();
+  final active = products.where((p) => p.status == 'active').toList();
+
+  final withStock = await Future.wait(
+    active.map((p) async {
+      final stock = await inventory.getCurrentStock(p.id);
+      return _ProductWithStock(product: p, stock: stock);
+    }),
+  );
+
+  return withStock;
+});
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -18,83 +37,48 @@ class SalesScreen extends ConsumerStatefulWidget {
 
 class _SalesScreenState extends ConsumerState<SalesScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<ProductsTableData> _allProducts = [];
-  List<ProductsTableData> _filteredProducts = [];
-  bool _isLoading = true;
   int _currentIndex = 0; // 0 = Add Item, 1 = Cart
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
-    _searchController.addListener(_filterProducts);
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase().trim();
+      });
+    });
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterProducts);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
-    try {
-      final db = ref.read(appDatabaseProvider);
-      final products = await db.productsDao.getAllProducts();
-      if (!mounted) return;
-      setState(() {
-        _allProducts = products.where((p) => p.status == 'active').toList();
-        _filteredProducts = _allProducts;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to load products'),
-          backgroundColor: JuselColors.destructive,
-        ),
-      );
-    }
+  int _cartQtyForProduct(String productId) {
+    final cart = ref.read(cartProvider);
+    return cart.items
+        .where((item) => item.productId == productId)
+        .fold<int>(0, (sum, item) => sum + item.quantity);
   }
 
-  void _filterProducts() {
-    final query = _searchController.text.toLowerCase().trim();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredProducts = _allProducts;
-      } else {
-        _filteredProducts = _allProducts
-            .where(
-              (product) =>
-                  product.name.toLowerCase().contains(query) ||
-                  product.category.toLowerCase().contains(query),
-            )
-            .toList();
-      }
-    });
-  }
-
-  void _handleAddToSale(
-    String productId,
+  Future<void> _handleAddToSale(
+    ProductsTableData product,
     int quantity,
     double? overriddenPrice,
-  ) {
-    ProductsTableData? product;
-    for (final p in [..._allProducts, ..._filteredProducts]) {
-      if (p.id == productId) {
-        product = p;
-        break;
-      }
-    }
-
-    if (product == null) {
+  ) async {
+    final inventory = ref.read(inventoryServiceProvider);
+    final availableStock = await inventory.getCurrentStock(product.id);
+    final inCart = _cartQtyForProduct(product.id);
+    if (quantity + inCart > availableStock) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Product not found or unavailable'),
+        SnackBar(
+          content: Text(
+            availableStock <= 0
+                ? 'This product is out of stock.'
+                : 'Only $availableStock in stock. Remove items from cart or reduce quantity.',
+          ),
           backgroundColor: JuselColors.destructive,
         ),
       );
@@ -105,7 +89,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
     cartNotifier.addItem(
       CartItem(
-        productId: productId,
+        productId: product.id,
         productName: product.name,
         quantity: quantity,
         unitPrice: overriddenPrice ?? product.currentSellingPrice,
@@ -131,7 +115,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     ProductSelectionModal.show(
       context,
       product: product,
-      onAddToSale: _handleAddToSale,
+      onAddToSale: (id, qty, price) => _handleAddToSale(product, qty, price),
     );
   }
 
@@ -220,6 +204,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   Widget _buildAddItemView() {
+    final productsAsync = ref.watch(_activeProductsWithStockProvider);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -258,10 +244,28 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           ),
           const SizedBox(height: JuselSpacing.s24),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredProducts.isEmpty
-                ? Center(
+            child: productsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text(
+                  'Failed to load products: $e',
+                  style: JuselTextStyles.bodyMedium.copyWith(
+                    color: JuselColors.destructive,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              data: (items) {
+                final filtered = items.where((item) {
+                  if (_searchQuery.isEmpty) return true;
+                  final name = item.product.name.toLowerCase();
+                  final category = item.product.category.toLowerCase();
+                  return name.contains(_searchQuery) ||
+                      category.contains(_searchQuery);
+                }).toList();
+
+                if (filtered.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -281,24 +285,45 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                         ),
                       ],
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: _filteredProducts.length,
-                    itemBuilder: (context, index) {
-                      final product = _filteredProducts[index];
-                      return _ProductCard(
-                        product: product,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ProductDetailScreen(product: product),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final item = filtered[index];
+                    final isOutOfStock = item.stock <= 0;
+                    final product =
+                        item.product.copyWith(currentStockQty: item.stock);
+                    return _ProductCard(
+                      product: product,
+                      stock: item.stock,
+                      disabled: isOutOfStock,
+                      onTap: isOutOfStock
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('This product is out of stock'),
+                                  backgroundColor: JuselColors.destructive,
+                                ),
+                              );
+                            }
+                          : () {
+                              _openProductModal(product);
+                            },
+                      onViewDetail: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ProductDetailScreen(productId: product.id),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -308,16 +333,25 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
 class _ProductCard extends StatelessWidget {
   final ProductsTableData product;
+  final int stock;
+  final bool disabled;
   final VoidCallback onTap;
+  final VoidCallback onViewDetail;
 
-  const _ProductCard({required this.product, required this.onTap});
+  const _ProductCard({
+    required this.product,
+    required this.stock,
+    required this.disabled,
+    required this.onTap,
+    required this.onViewDetail,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: JuselSpacing.s12),
       child: InkWell(
-        onTap: onTap,
+        onTap: disabled ? null : onTap,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.all(JuselSpacing.s16),
@@ -334,7 +368,19 @@ class _ProductCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: JuselSpacing.s4),
-                    Text(product.category, style: JuselTextStyles.bodySmall),
+                    Text(
+                      product.category,
+                      style: JuselTextStyles.bodySmall.copyWith(
+                        color: JuselColors.mutedForeground,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: onViewDetail,
+                      child: const Text(
+                        'View details',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -355,13 +401,18 @@ class _ProductCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: JuselColors.success.withOpacity(0.1),
+                      color: disabled
+                          ? JuselColors.muted
+                          : JuselColors.success.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${product.currentStockQty} in stock',
+                      disabled
+                          ? 'Out of stock'
+                          : '$stock in stock',
                       style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.success,
+                        color:
+                            disabled ? JuselColors.mutedForeground : JuselColors.success,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -374,4 +425,14 @@ class _ProductCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProductWithStock {
+  final ProductsTableData product;
+  final int stock;
+
+  const _ProductWithStock({
+    required this.product,
+    required this.stock,
+  });
 }

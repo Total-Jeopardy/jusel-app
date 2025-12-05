@@ -1,19 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/stock/view/restock_screen.dart';
 
-class ProductDetailScreen extends StatelessWidget {
-  final ProductsTableData product;
+final productDetailProvider = FutureProvider.autoDispose
+    .family<_ProductDetailData, String>((ref, productId) async {
+      final db = ref.read(appDatabaseProvider);
+      final inventory = ref.read(inventoryServiceProvider);
 
-  const ProductDetailScreen({super.key, required this.product});
+      final product = await db.productsDao.getProduct(productId);
+      if (product == null) {
+        throw Exception('Product not found');
+      }
+
+      final stock = await inventory.getCurrentStock(productId);
+      final movements = await db.stockMovementsDao.getMovementsForProduct(
+        productId,
+      );
+
+      return _ProductDetailData(
+        product: product,
+        stock: stock,
+        movements: movements,
+      );
+    });
+
+class ProductDetailScreen extends ConsumerWidget {
+  final String productId;
+
+  const ProductDetailScreen({super.key, required this.productId});
 
   @override
-  Widget build(BuildContext context) {
-    final sellingPrice = product.currentSellingPrice;
-    final costPrice = product.currentCostPrice;
-    final margin = sellingPrice == 0
-        ? 0
-        : ((sellingPrice - costPrice) / sellingPrice) * 100;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detail = ref.watch(productDetailProvider(productId));
 
     return Scaffold(
       backgroundColor: JuselColors.background,
@@ -28,167 +51,265 @@ class ProductDetailScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _HeaderCard(product: product),
-            const SizedBox(height: JuselSpacing.s12),
-            _InfoCard(
-              children: [
-                _InfoRow(
-                  label: 'Selling Price',
-                  value: 'GHS ${sellingPrice.toStringAsFixed(2)}',
-                  valueColor: JuselColors.primary,
-                  bold: true,
-                  dense: true,
-                ),
-                _DividerRow(),
-                _InfoRow(
-                  label: 'Cost Price',
-                  value: 'GHS ${costPrice.toStringAsFixed(2)}',
-                  helper: 'Margin: ${margin.toStringAsFixed(0)}%',
-                  valueBold: true,
-                  helperUnderValue: true,
-                  dense: true,
-                ),
-                _DividerRow(),
-                _InfoRow(
-                  label: 'Units per Pack',
-                  value: product.unitsPerPack?.toString() ?? '--',
-                  valueBold: true,
-                  helperUnderValue: true,
-                  dense: true,
-                ),
-                _DividerRow(),
-                const _SectionTitle('Price History (Last 6 Months)'),
-                const SizedBox(height: JuselSpacing.s12),
-                _MonthsRow(),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s12),
-            _InfoCard(
-              children: [
-                const _SectionTitle('Stock Alerts'),
-                _DividerRow(),
-                const _InfoRow(label: 'Low stock threshold', value: '10'),
-                _DividerRow(),
-                const _InfoRow(
-                  label: 'Reorder recommendation',
-                  value: 'Buy 24 units',
-                  valueColor: JuselColors.primary,
-                  bold: true,
-                ),
-                _DividerRow(),
-                const _InfoRow(
-                  label: 'Days until out-of-stock',
-                  value: '~2 days',
-                  valueColor: Color(0xFFFB923C),
-                  bold: true,
-                ),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s12),
-            _InfoCard(
-              children: [
-                const _InfoRow(
-                  label: 'Status',
-                  value: 'Active',
-                  valueColor: JuselColors.success,
-                  showDot: true,
-                  dense: true,
-                ),
-                _DividerRow(),
-                const Row(
-                  children: [
-                    Expanded(
-                      child: _StatTile(
-                        label: 'Last Restock',
-                        value: 'Oct 24, 2023',
-                      ),
-                    ),
-                    SizedBox(width: JuselSpacing.s12),
-                    Expanded(
-                      child: _StatTile(
-                        label: 'Total Sold',
-                        value: '1,240 units',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: JuselSpacing.s12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: JuselSpacing.s16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  backgroundColor: JuselColors.primary,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_circle_outline, color: Colors.white),
-                    SizedBox(width: JuselSpacing.s8),
-                    Text(
-                      'Restock Product',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+      body: detail.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(JuselSpacing.s16),
+            child: Text(
+              'Failed to load product: $e',
+              style: JuselTextStyles.bodyMedium.copyWith(
+                color: JuselColors.destructive,
+                fontWeight: FontWeight.w700,
               ),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: JuselSpacing.s12),
-            Column(
+          ),
+        ),
+        data: (data) {
+          final product = data.product;
+          final stock = data.stock;
+          final sellingPrice = product.currentSellingPrice;
+          final costPrice = product.currentCostPrice;
+          final margin = sellingPrice == 0
+              ? 0
+              : costPrice == 0
+              ? 100
+              : ((sellingPrice - costPrice) / sellingPrice) * 100;
+
+          final lastMovement = data.movements.isNotEmpty
+              ? data.movements.first
+              : null;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _NavTile(label: 'Edit Product', onTap: () {}),
+                _HeaderCard(product: product, stock: stock),
                 const SizedBox(height: JuselSpacing.s12),
-                _NavTile(label: 'View Stock Movements', onTap: () {}),
+                _InfoCard(
+                  children: [
+                    _InfoRow(
+                      label: 'Selling Price',
+                      value: 'GHS ${sellingPrice.toStringAsFixed(2)}',
+                      valueColor: JuselColors.primary,
+                      bold: true,
+                      dense: true,
+                    ),
+                    _DividerRow(),
+                    _InfoRow(
+                      label: 'Cost Price',
+                      value: 'GHS ${costPrice.toStringAsFixed(2)}',
+                      helper: 'Margin: ${margin.toStringAsFixed(0)}%',
+                      valueBold: true,
+                      helperUnderValue: true,
+                      dense: true,
+                    ),
+                    _DividerRow(),
+                    _InfoRow(
+                      label: 'Units per Pack',
+                      value: product.unitsPerPack?.toString() ?? '--',
+                      valueBold: true,
+                      helperUnderValue: true,
+                      dense: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                _InfoCard(
+                  children: [
+                    const _SectionTitle('Stock & Activity'),
+                    _DividerRow(),
+                    _InfoRow(
+                      label: 'Current Stock',
+                      value: '$stock units',
+                      valueColor: stock <= 0
+                          ? JuselColors.destructive
+                          : JuselColors.foreground,
+                      bold: true,
+                    ),
+                    _DividerRow(),
+                    _InfoRow(
+                      label: 'Status',
+                      value: product.status,
+                      valueColor: _statusColor(product.status),
+                      showDot: true,
+                      dense: true,
+                    ),
+                    _DividerRow(),
+                    _InfoRow(
+                      label: 'Last Movement',
+                      value: lastMovement == null
+                          ? 'No movements yet'
+                          : '${DateFormat('MMM d, yyyy').format(lastMovement.createdAt)}',
+                      dense: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                _InfoCard(
+                  children: [
+                    const _SectionTitle('Recent Movements'),
+                    const SizedBox(height: JuselSpacing.s8),
+                    if (data.movements.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: JuselSpacing.s8,
+                        ),
+                        child: Text(
+                          'No movements recorded yet.',
+                          style: JuselTextStyles.bodySmall.copyWith(
+                            color: JuselColors.mutedForeground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    else
+                      ...data.movements.take(5).map((m) {
+                        final sign = m.quantityUnits > 0 ? '+' : '';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: JuselSpacing.s8,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    m.type,
+                                    style: JuselTextStyles.bodyMedium.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat(
+                                      'MMM d, h:mm a',
+                                    ).format(m.createdAt),
+                                    style: JuselTextStyles.bodySmall.copyWith(
+                                      color: JuselColors.mutedForeground,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '$sign${m.quantityUnits}',
+                                style: JuselTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: m.quantityUnits >= 0
+                                      ? JuselColors.success
+                                      : JuselColors.destructive,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RestockScreen(
+                            productId: product.id,
+                            productName: product.name,
+                            category: product.category,
+                            currentStock: stock,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: JuselSpacing.s16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: JuselColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_circle_outline, color: Colors.white),
+                        SizedBox(width: JuselSpacing.s8),
+                        Text(
+                          'Restock Product',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                Column(
+                  children: [
+                    _NavTile(label: 'Edit Product', onTap: () {}),
+                    const SizedBox(height: JuselSpacing.s12),
+                    _NavTile(label: 'View Stock Movements', onTap: () {}),
+                  ],
+                ),
+                const SizedBox(height: JuselSpacing.s12),
               ],
             ),
-            const SizedBox(height: JuselSpacing.s12),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
+Color _statusColor(String status) {
+  final s = status.toLowerCase();
+  if (s.contains('out')) return JuselColors.destructive;
+  if (s.contains('low')) return const Color(0xFFF59E0B);
+  if (s.contains('inactive')) return JuselColors.mutedForeground;
+  return const Color(0xFF16A34A);
+}
+
+class _ProductDetailData {
+  final ProductsTableData product;
+  final int stock;
+  final List<StockMovementsTableData> movements;
+
+  const _ProductDetailData({
+    required this.product,
+    required this.stock,
+    required this.movements,
+  });
+}
+
 class _HeaderCard extends StatelessWidget {
   final ProductsTableData product;
-  const _HeaderCard({required this.product});
+  final int stock;
+  const _HeaderCard({required this.product, required this.stock});
 
   String _statusLabel() {
-    final count = product.currentStockQty;
-    final status = product.status.toLowerCase();
-    if (status.contains('out')) return 'Out of Stock';
-    if (status.contains('low')) return 'Low Stock ($count)';
+    if (stock <= 0) return 'Out of Stock';
+    if (stock <= 10) return 'Low Stock ($stock)';
     return 'In Stock';
   }
 
   Color _statusColor() {
-    final status = product.status.toLowerCase();
-    if (status.contains('out')) return const Color(0xFFEF4444);
-    if (status.contains('low')) return const Color(0xFFF59E0B);
+    if (stock <= 0) return const Color(0xFFEF4444);
+    if (stock <= 10) return const Color(0xFFF59E0B);
     return const Color(0xFF16A34A);
   }
 
   Color _statusBg() {
-    final status = product.status.toLowerCase();
-    if (status.contains('out')) return const Color(0xFFFFF1F2);
-    if (status.contains('low')) return const Color(0xFFFFF7E6);
+    if (stock <= 0) return const Color(0xFFFFF1F2);
+    if (stock <= 10) return const Color(0xFFFFF7E6);
     return const Color(0xFFE9F8EF);
   }
 
@@ -395,27 +516,6 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _MonthsRow extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    const months = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: months
-          .map(
-            (m) => Text(
-              m,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
 class _NavTile extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -484,49 +584,6 @@ class _StatusPill extends StatelessWidget {
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StatTile({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: JuselSpacing.s12,
-        vertical: JuselSpacing.s12,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: JuselTextStyles.bodySmall.copyWith(
-              color: JuselColors.mutedForeground,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: JuselSpacing.s4),
-          Text(
-            value,
-            style: JuselTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.w800,
-              color: JuselColors.foreground,
-            ),
-          ),
-        ],
       ),
     );
   }

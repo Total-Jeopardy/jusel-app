@@ -94,4 +94,10 @@ class ProductionBatchesDao extends DatabaseAccessor<AppDatabase>
       productionBatchesTable,
     )..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])).get();
   }
+
+  /// Fetch a single batch by id.
+  Future<ProductionBatchesTableData?> getBatch(int id) {
+    return (select(productionBatchesTable)..where((tbl) => tbl.id.equals(id)))
+        .getSingleOrNull();
+  }
 }

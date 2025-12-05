@@ -1,10 +1,14 @@
 import 'dart:math' as math;
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:jusel_app/features/stock/view/restock_success_screen.dart';
 
 class RestockScreen extends ConsumerStatefulWidget {
@@ -28,13 +32,9 @@ class RestockScreen extends ConsumerStatefulWidget {
 }
 
 class _RestockScreenState extends ConsumerState<RestockScreen> {
-  // Placeholder product for now; hook up to real selection later.
-  late final _ProductSummary _product = _ProductSummary(
-    name: widget.productName ?? 'Cola 500ml',
-    category: widget.category ?? 'Drinks',
-    currentStock: widget.currentStock ?? 4,
-    imageAsset: widget.imageAsset,
-  );
+  String? _selectedProductId;
+  _ProductOption? _selectedProduct;
+  bool _initializedSelection = false;
   final TextEditingController _packsController = TextEditingController(
     text: '5',
   );
@@ -67,12 +67,25 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
   double get _costPerUnit =>
       _totalUnitsAdding > 0 ? _totalCost / _totalUnitsAdding : 0.0;
 
-  static const double _previousCostPerUnit = 0.45;
-  int get _previousStock => _product.currentStock;
+  double get _previousCostPerUnit =>
+      _selectedProduct?.product.currentCostPrice ?? 0.0;
+  int get _previousStock => _selectedProduct?.stock ?? 0;
   bool _submitting = false;
+  bool get _isFormValid =>
+      _selectedProduct != null &&
+      _totalUnitsAdding > 0 &&
+      _totalCost > 0 &&
+      _costPerUnit > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProductId = widget.productId;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final productsAsync = ref.watch(_restockProductsProvider);
     final newTotalStock = _previousStock + _totalUnitsAdding;
 
     return Scaffold(
@@ -81,7 +94,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Restock',
@@ -105,7 +118,59 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                 ),
               ),
               const SizedBox(height: JuselSpacing.s12),
-              _ProductCard(product: _product),
+              productsAsync.when(
+                loading: () => const _ProductCard(),
+                error: (e, _) => _ProductCard(
+                  errorText: 'Failed to load products',
+                ),
+                data: (products) {
+                  if (!_initializedSelection && products.isNotEmpty) {
+                    final initialId =
+                        _selectedProductId ?? widget.productId ?? '';
+                    final selected = products.firstWhere(
+                      (p) => p.product.id == initialId,
+                      orElse: () => products.first,
+                    );
+                    _selectedProductId = selected.product.id;
+                    _selectedProduct = selected;
+                    _initializedSelection = true;
+                  }
+                  final summary = _selectedProduct == null
+                      ? null
+                      : _ProductSummary(
+                          name: _selectedProduct!.product.name,
+                          category: _selectedProduct!.product.category,
+                          currentStock: _selectedProduct!.stock,
+                          imageAsset: widget.imageAsset,
+                        );
+                  return _ProductCard(
+                    product: summary,
+                    onTap: products.isEmpty
+                        ? null
+                        : () async {
+                            final choice = await showModalBottomSheet<String>(
+                              context: context,
+                              builder: (context) => _ProductPicker(
+                                products: products,
+                                selectedId: _selectedProductId,
+                              ),
+                            );
+                            if (choice == null) return;
+                            final selected = products.firstWhere(
+                              (p) => p.product.id == choice,
+                            );
+                            setState(() {
+                              _selectedProductId = choice;
+                              _selectedProduct = selected;
+                              // reset mode-specific fields when switching product
+                              if (_mode == RestockMode.units) {
+                                _unitsPerPackController.text = '1';
+                              }
+                            });
+                          },
+                  );
+                },
+              ),
               const SizedBox(height: JuselSpacing.s24),
               Text(
                 'Restock Mode',
@@ -150,8 +215,8 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
               const SizedBox(height: JuselSpacing.s20),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submitting ? null : _handleConfirm,
+            child: ElevatedButton(
+              onPressed: _submitting || !_isFormValid ? null : _handleConfirm,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: JuselColors.primary,
                     foregroundColor: JuselColors.primaryForeground,
@@ -162,10 +227,24 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Confirm Restock',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          'Confirm Restock',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: JuselSpacing.s20),
@@ -184,61 +263,76 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
     super.dispose();
   }
 
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: JuselColors.destructive,
+      ),
+    );
+  }
+
+  String _friendlyError(Object error) {
+    return error.toString().replaceFirst(RegExp(r'^Exception: '), '').trim();
+  }
+
   Future<void> _handleConfirm() async {
+    FocusScope.of(context).unfocus();
+
     if (_totalUnitsAdding <= 0 || _totalCost <= 0 || _costPerUnit <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter valid units and total cost to proceed'),
-          backgroundColor: JuselColors.destructive,
-        ),
-      );
+      _showError('Enter valid units and total cost to proceed');
       return;
     }
 
-    final productId = widget.productId;
-    if (productId == null || productId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Missing product data for restock'),
-          backgroundColor: JuselColors.destructive,
-        ),
-      );
+    final productId = _selectedProductId ?? widget.productId;
+    if (productId == null || productId.isEmpty || _selectedProduct == null) {
+      _showError('Missing product data for restock');
       return;
     }
 
-    final user = FirebaseAuth.instance.currentUser;
+    final authState = ref.read(authViewModelProvider);
+    final user = authState.valueOrNull;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in to restock'),
-          backgroundColor: JuselColors.destructive,
-        ),
-      );
+      _showError('Please log in to restock');
       return;
     }
     final userId = user.uid;
-    final restockedByDisplay = user.displayName?.trim().isNotEmpty == true
-        ? user.displayName!
-        : 'User';
+    final restockedByDisplay = user.name.trim().isNotEmpty ? user.name : 'User';
     final restockService = ref.read(restockServiceProvider);
 
     setState(() => _submitting = true);
     try {
-      await restockService.restockByUnits(
-        productId: productId,
-        units: _totalUnitsAdding,
-        costPerUnit: _costPerUnit,
-        createdByUserId: userId,
-      );
+      if (_mode == RestockMode.packs) {
+        if (_packs <= 0) {
+          _showError('Pack count must be greater than zero');
+          return;
+        }
+        // Service expects packPrice (per pack); UI collects total cost.
+        final packPrice = _totalCost / _packs;
+        await restockService.restockFromPacks(
+          productId: productId,
+          packCount: _packs,
+          packPrice: packPrice,
+          createdByUserId: userId,
+        );
+      } else {
+        await restockService.restockByUnits(
+          productId: productId,
+          units: _totalUnitsAdding,
+          costPerUnit: _costPerUnit,
+          createdByUserId: userId,
+        );
+      }
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => RestockSuccessScreen(
-            productName: _product.name,
-            category: _product.category,
-            imageAsset: _product.imageAsset,
+            productId: productId,
+            productName: _selectedProduct!.product.name,
+            category: _selectedProduct!.product.category,
+            imageAsset: widget.imageAsset,
             unitsAdded: _totalUnitsAdding,
             newTotalStock: _previousStock + _totalUnitsAdding,
             costPerUnit: _costPerUnit,
@@ -250,12 +344,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Restock failed: $e'),
-            backgroundColor: JuselColors.destructive,
-          ),
-        );
+        _showError('Restock failed. ${_friendlyError(e)}');
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -264,9 +353,11 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
 }
 
 class _ProductCard extends StatelessWidget {
-  final _ProductSummary product;
+  final _ProductSummary? product;
+  final VoidCallback? onTap;
+  final String? errorText;
 
-  const _ProductCard({required this.product});
+  const _ProductCard({this.product, this.onTap, this.errorText});
 
   @override
   Widget build(BuildContext context) {
@@ -276,9 +367,7 @@ class _ProductCard extends StatelessWidget {
       elevation: 1,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () {
-          // TODO: open product selection modal
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(JuselSpacing.s16),
           child: Row(
@@ -287,49 +376,67 @@ class _ProductCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product.name,
-                      style: JuselTextStyles.headlineSmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: JuselColors.foreground,
+                    if (errorText != null)
+                      Text(
+                        errorText!,
+                        style: JuselTextStyles.bodyMedium.copyWith(
+                          color: JuselColors.destructive,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else if (product == null)
+                      Text(
+                        'Select a product to restock',
+                        style: JuselTextStyles.headlineSmall.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.foreground,
+                        ),
+                      )
+                    else ...[
+                      Text(
+                        product!.name,
+                        style: JuselTextStyles.headlineSmall.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.foreground,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: JuselSpacing.s4),
-                    Text(
-                      'Category: ${product.category}',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      const SizedBox(height: JuselSpacing.s4),
+                      Text(
+                        'Category: ${product!.category}',
+                        style: JuselTextStyles.bodySmall.copyWith(
+                          color: JuselColors.mutedForeground,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: JuselSpacing.s12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1F2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: JuselColors.destructive,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Current Stock: ${product.currentStock} units',
-                            style: JuselTextStyles.bodySmall.copyWith(
+                      const SizedBox(height: JuselSpacing.s12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
                               color: JuselColors.destructive,
-                              fontWeight: FontWeight.w600,
+                              size: 16,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Text(
+                              'Current Stock: ${product!.currentStock} units',
+                              style: JuselTextStyles.bodySmall.copyWith(
+                                color: JuselColors.destructive,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -340,6 +447,90 @@ class _ProductCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProductPicker extends StatelessWidget {
+  final List<_ProductOption> products;
+  final String? selectedId;
+
+  const _ProductPicker({
+    required this.products,
+    required this.selectedId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: JuselColors.mutedForeground.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: JuselSpacing.s16,
+              vertical: JuselSpacing.s8,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Product',
+                  style: JuselTextStyles.headlineSmall.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${products.length} total',
+                  style: JuselTextStyles.bodySmall.copyWith(
+                    color: JuselColors.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: products.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = products[index];
+                final selected = selectedId == item.product.id;
+                return ListTile(
+                  onTap: () => Navigator.pop(context, item.product.id),
+                  title: Text(
+                    item.product.name,
+                    style: JuselTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Category: ${item.product.category} · Stock: ${item.stock}',
+                    style: JuselTextStyles.bodySmall.copyWith(
+                      color: JuselColors.mutedForeground,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: selected
+                      ? const Icon(Icons.check, color: JuselColors.primary)
+                      : null,
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -402,6 +593,9 @@ class _RestockModeCard extends StatelessWidget {
                     controller: packsController,
                     enabled: true,
                     textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (_) => onChanged(),
                   ),
                 ),
@@ -412,6 +606,9 @@ class _RestockModeCard extends StatelessWidget {
                     controller: unitsPerPackController,
                     enabled: isPacks,
                     suffixIcon: const Icon(Icons.edit, size: 18),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (_) => onChanged(),
                   ),
                 ),
@@ -479,6 +676,7 @@ class _LabeledField extends StatelessWidget {
   final Widget? suffixIcon;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _LabeledField({
     required this.label,
@@ -487,6 +685,7 @@ class _LabeledField extends StatelessWidget {
     this.suffixIcon,
     this.textInputAction,
     this.onChanged,
+    this.inputFormatters,
   });
 
   @override
@@ -508,6 +707,7 @@ class _LabeledField extends StatelessWidget {
           keyboardType: TextInputType.number,
           textInputAction: textInputAction,
           onChanged: onChanged,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             suffixIcon: suffixIcon == null
                 ? null
@@ -617,6 +817,9 @@ class _TotalCostCard extends StatelessWidget {
                 decimal: true,
               ),
               onChanged: (_) => onCostChanged(),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
               decoration: const InputDecoration(),
             ),
             const SizedBox(height: JuselSpacing.s16),
@@ -919,3 +1122,26 @@ class _ProductSummary {
     this.imageAsset,
   });
 }
+class _ProductOption {
+  final ProductsTableData product;
+  final int stock;
+
+  const _ProductOption({required this.product, required this.stock});
+}
+
+final _restockProductsProvider =
+    FutureProvider.autoDispose<List<_ProductOption>>((ref) async {
+  final db = ref.read(appDatabaseProvider);
+  final inventory = ref.read(inventoryServiceProvider);
+  final products = await db.productsDao.getAllProducts();
+  final stockMap = await inventory.getAllCurrentStock();
+  final active = products.where((p) => p.status.toLowerCase() == 'active');
+  return active
+      .map(
+        (p) => _ProductOption(
+          product: p,
+          stock: stockMap[p.id] ?? p.currentStockQty,
+        ),
+      )
+      .toList();
+});

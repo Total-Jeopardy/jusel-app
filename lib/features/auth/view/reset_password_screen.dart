@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 
@@ -58,7 +59,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
         ),
         title: const Text(
           'Reset Password',
@@ -90,7 +91,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             ),
             const SizedBox(height: JuselSpacing.s12),
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
               child: const Text(
                 'Cancel',
                 style: TextStyle(
@@ -184,7 +185,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           backgroundColor: JuselColors.success,
         ),
       );
-      Navigator.pop(context);
+      safePop(context, fallbackRoute: '/boss-dashboard');
     } catch (e) {
       if (!mounted) return;
       String message = 'Reset failed';

@@ -1,18 +1,228 @@
-import 'package:flutter/material.dart';
-import 'package:jusel_app/core/utils/theme.dart';
+import 'dart:convert';
 
-class AddProductScreen extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/core/utils/product_constants.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
+
+class AddProductScreen extends ConsumerStatefulWidget {
   const AddProductScreen({super.key});
 
   @override
+  ConsumerState<AddProductScreen> createState() => _AddProductScreenState();
+}
+
+class _AddProductScreenState extends ConsumerState<AddProductScreen> {
+  // Form controllers
+  final _nameController = TextEditingController();
+  final _unitsPerPackController = TextEditingController();
+  final _initialStockController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
+  final _costPriceController = TextEditingController();
+
+  // Form state
+  late String _selectedCategory;
+  String? _selectedSubcategory;
+  bool _isActive = true;
+  bool _isSaving = false;
+
+  // Category options (using display names for UI)
+  late final List<String> _categoryDisplayNames;
+  late final Map<String, List<String>> _subcategoryDisplayNames;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize category display names
+    _categoryDisplayNames = ProductCategories.all
+        .map((cat) => ProductHelpers.categoryToDisplay(cat))
+        .toList();
+    
+    // Initialize subcategory display names by category
+    _subcategoryDisplayNames = {};
+    for (final category in ProductCategories.all) {
+      final subcats = ProductCategories.subcategories[category] ?? [];
+      _subcategoryDisplayNames[ProductHelpers.categoryToDisplay(category)] =
+          subcats.map((sub) => ProductHelpers.subcategoryToDisplay(sub)).toList();
+    }
+    
+    // Set default category
+    _selectedCategory = _categoryDisplayNames.first;
+    final defaultSubcats = _subcategoryDisplayNames[_selectedCategory];
+    _selectedSubcategory = defaultSubcats?.isNotEmpty == true ? defaultSubcats![0] : null;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _unitsPerPackController.dispose();
+    _initialStockController.dispose();
+    _sellingPriceController.dispose();
+    _costPriceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    // Validation
+    if (_nameController.text.trim().isEmpty) {
+      _showError('Please enter a product name');
+      return;
+    }
+
+    final sellingPrice = double.tryParse(_sellingPriceController.text.trim());
+    if (sellingPrice == null || sellingPrice < 0) {
+      _showError('Please enter a valid selling price');
+      return;
+    }
+
+    final costPrice = _costPriceController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_costPriceController.text.trim());
+    if (costPrice != null && costPrice < 0) {
+      _showError('Please enter a valid cost price');
+      return;
+    }
+
+    final unitsPerPack = _unitsPerPackController.text.trim().isEmpty
+        ? null
+        : int.tryParse(_unitsPerPackController.text.trim());
+    if (unitsPerPack != null && unitsPerPack <= 0) {
+      _showError('Units per pack must be greater than 0');
+      return;
+    }
+
+    final initialStock = int.tryParse(_initialStockController.text.trim()) ?? 0;
+    if (initialStock < 0) {
+      _showError('Initial stock cannot be negative');
+      return;
+    }
+
+    // Get current user
+    final authState = ref.read(authViewModelProvider);
+    final currentUser = authState.valueOrNull;
+    if (currentUser == null) {
+      _showError('You must be logged in to add a product');
+      return;
+    }
+
+    // Check if user is boss for cost price
+    final isBoss = currentUser.role == 'boss';
+    if (!isBoss && costPrice != null && costPrice > 0) {
+      _showError('Only bosses can set cost price');
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final syncQueueDao = ref.read(pendingSyncQueueDaoProvider);
+      
+      // Generate unique product ID (using timestamp for now)
+      // TODO: Consider using Firestore auto-ID generation if backend expects it
+      final productId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Convert display names to canonical values
+      final canonicalCategory = ProductHelpers.categoryFromDisplay(_selectedCategory) ?? 
+                                _selectedCategory.toLowerCase();
+      final canonicalSubcategory = _selectedSubcategory != null
+          ? ProductHelpers.subcategoryFromDisplay(_selectedSubcategory!)
+          : null;
+
+      // Determine if product is produced using helper function
+      final isProduced = ProductHelpers.isProduced(
+        category: canonicalCategory,
+        subcategory: canonicalSubcategory,
+      );
+
+      // Determine status from toggle
+      final status = _isActive ? ProductStatus.active : ProductStatus.inactive;
+
+      // Create product in local database
+      await db.productsDao.createProduct(
+        id: productId,
+        name: _nameController.text.trim(),
+        category: canonicalCategory,
+        subcategory: canonicalSubcategory,
+        isProduced: isProduced,
+        currentCostPrice: costPrice,
+        sellingPrice: sellingPrice,
+        unitsPerPack: unitsPerPack,
+        createdByUserId: currentUser.uid,
+        initialStock: initialStock,
+        status: status,
+      );
+
+      // Enqueue for sync to Firestore
+      final payload = {
+        'id': productId,
+        'name': _nameController.text.trim(),
+        'category': canonicalCategory,
+        'subcategory': canonicalSubcategory,
+        'isProduced': isProduced,
+        'currentSellingPrice': sellingPrice,
+        'currentCostPrice': costPrice ?? 0.0,
+        'unitsPerPack': unitsPerPack,
+        'status': status,
+        'createdAt': DateTime.now().toIso8601String(),
+        'updatedAt': null,
+      };
+
+      await syncQueueDao.enqueueOperation(
+        id: productId,
+        operationType: 'product_create',
+        payload: jsonEncode(payload),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Product saved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop(true); // Return true to indicate success
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to save product: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authViewModelProvider);
+    final currentUser = authState.valueOrNull;
+    final isBoss = currentUser?.role == 'boss';
+
     return Scaffold(
       backgroundColor: JuselColors.background,
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: _isSaving ? null : () => Navigator.of(context).maybePop(),
         ),
         title: const Text(
           'Add Product',
@@ -33,30 +243,51 @@ class AddProductScreen extends StatelessWidget {
                   _LabeledField(
                     label: 'Product Name',
                     child: TextField(
+                      controller: _nameController,
                       decoration: _inputDecoration('e.g. Orange Juice 1L'),
                     ),
                   ),
-                  _DividerRow(),
-                  const _LabeledField(
+                  const _DividerRow(),
+                  _LabeledField(
                     label: 'Category',
                     child: _DropdownField(
-                      value: 'Drinks',
-                      items: ['Drinks', 'Snacks', 'Bakery'],
+                      value: _selectedCategory,
+                      items: _categoryDisplayNames,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedCategory = value!;
+                          // Reset subcategory when category changes
+                          final subcats = _subcategoryDisplayNames[_selectedCategory];
+                          _selectedSubcategory = subcats?.isNotEmpty == true ? subcats![0] : null;
+                        });
+                      },
                     ),
                   ),
-                  _DividerRow(),
-                  const _LabeledField(
+                  const _DividerRow(),
+                  _LabeledField(
                     label: 'Subcategory',
                     child: _DropdownField(
-                      value: 'Soft Drink',
-                      items: ['Soft Drink', 'Juice', 'Water'],
+                      value: _selectedSubcategory,
+                      items: _subcategoryDisplayNames[_selectedCategory] ?? [],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSubcategory = value;
+                        });
+                      },
                     ),
                   ),
-                  _DividerRow(),
-                  const _LabeledField(
+                  const _DividerRow(),
+                  _LabeledField(
                     label: 'Product Type',
                     child: _DisabledField(
-                      text: 'Purchased (Auto-detected)',
+                      text: ProductHelpers.isProduced(
+                        category: ProductHelpers.categoryFromDisplay(_selectedCategory) ?? _selectedCategory.toLowerCase(),
+                        subcategory: _selectedSubcategory != null
+                            ? ProductHelpers.subcategoryFromDisplay(_selectedSubcategory!)
+                            : null,
+                      )
+                          ? 'Produced (Auto-detected)'
+                          : 'Purchased (Auto-detected)',
                       icon: Icons.info_outline,
                     ),
                   ),
@@ -67,12 +298,16 @@ class AddProductScreen extends StatelessWidget {
             const _SectionTitle('PACK CONFIGURATION'),
             _FieldCard(
               child: Column(
-                children: const [
+                children: [
                   _LabeledField(
                     label: 'Units per Pack',
                     child: _FilledInput(
+                      controller: _unitsPerPackController,
                       hint: '6',
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       trailingText: 'btls',
                     ),
                   ),
@@ -83,13 +318,17 @@ class AddProductScreen extends StatelessWidget {
             const _SectionTitle('INVENTORY'),
             _FieldCard(
               child: Column(
-                children: const [
+                children: [
                   _LabeledField(
                     label: 'Initial Stock',
                     helper: 'Optional',
                     child: _FilledInput(
+                      controller: _initialStockController,
                       hint: '0',
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       trailingText: 'units',
                     ),
                   ),
@@ -104,20 +343,26 @@ class AddProductScreen extends StatelessWidget {
                   _LabeledField(
                     label: 'Selling Price',
                     child: _FilledInput(
+                      controller: _sellingPriceController,
                       hint: '\$ 0.00',
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
                     ),
                   ),
-                  _DividerRow(),
+                  const _DividerRow(),
                   _LabeledField(
                     label: 'Cost Price',
-                    trailing: _UnitTag(
-                      'BOSS ONLY',
-                      color: const Color(0xFF2563EB),
-                    ),
+                    trailing: const _UnitTag('BOSS ONLY', color: Color(0xFF2563EB)),
                     child: _FilledInput(
+                      controller: _costPriceController,
                       hint: '\$ 0.00',
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      enabled: isBoss,
                     ),
                   ),
                 ],
@@ -129,15 +374,19 @@ class AddProductScreen extends StatelessWidget {
               child: _ToggleRow(
                 label: 'Product Status',
                 helper: 'Available for sales',
-                value: true,
-                onChanged: (_) {},
+                value: _isActive,
+                onChanged: (value) {
+                  setState(() {
+                    _isActive = value;
+                  });
+                },
               ),
             ),
             const SizedBox(height: JuselSpacing.s20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _isSaving ? null : _handleSave,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     vertical: JuselSpacing.s12,
@@ -147,11 +396,21 @@ class AddProductScreen extends StatelessWidget {
                   ),
                   backgroundColor: JuselColors.primary,
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey,
                 ),
-                child: const Text(
-                  'Save Product',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        'Save Product',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
               ),
             ),
             const SizedBox(height: JuselSpacing.s12),
@@ -225,7 +484,7 @@ class _FieldCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -306,10 +565,15 @@ InputDecoration _inputDecoration(String hint) {
 }
 
 class _DropdownField extends StatelessWidget {
-  final String value;
+  final String? value;
   final List<String> items;
+  final ValueChanged<String?>? onChanged;
 
-  const _DropdownField({required this.value, required this.items});
+  const _DropdownField({
+    required this.value,
+    required this.items,
+    this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +606,7 @@ class _DropdownField extends StatelessWidget {
                 ),
               )
               .toList(),
-          onChanged: (_) {},
+          onChanged: onChanged,
         ),
       ),
     );
@@ -414,7 +678,7 @@ class _ToggleRow extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: Colors.white,
+          activeThumbColor: Colors.white,
           activeTrackColor: JuselColors.primary,
         ),
       ],
@@ -423,6 +687,8 @@ class _ToggleRow extends StatelessWidget {
 }
 
 class _DividerRow extends StatelessWidget {
+  const _DividerRow();
+
   @override
   Widget build(BuildContext context) {
     return const Divider(height: 16, color: Color(0xFFE5E7EB), thickness: 1);
@@ -464,14 +730,20 @@ class _DisabledField extends StatelessWidget {
 }
 
 class _FilledInput extends StatelessWidget {
+  final TextEditingController? controller;
   final String hint;
   final TextInputType? keyboardType;
   final String? trailingText;
+  final bool enabled;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _FilledInput({
+    this.controller,
     required this.hint,
     this.keyboardType,
     this.trailingText,
+    this.enabled = true,
+    this.inputFormatters,
   });
 
   @override
@@ -479,7 +751,9 @@ class _FilledInput extends StatelessWidget {
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F6FF),
+        color: enabled 
+            ? const Color(0xFFF2F6FF)
+            : const Color(0xFFE9EEF6),
         borderRadius: BorderRadius.circular(14),
       ),
       padding: EdgeInsets.symmetric(
@@ -490,7 +764,10 @@ class _FilledInput extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
+              controller: controller,
               keyboardType: keyboardType,
+              enabled: enabled,
+              inputFormatters: inputFormatters,
               decoration: InputDecoration(
                 hintText: hint,
                 border: InputBorder.none,
@@ -500,7 +777,9 @@ class _FilledInput extends StatelessWidget {
                 ),
               ),
               style: JuselTextStyles.bodyMedium.copyWith(
-                color: JuselColors.foreground,
+                color: enabled 
+                    ? JuselColors.foreground
+                    : JuselColors.mutedForeground,
               ),
             ),
           ),

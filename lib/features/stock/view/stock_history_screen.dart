@@ -1,31 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:jusel_app/core/database/app_database.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/utils/theme.dart';
-import 'package:jusel_app/features/stock/view/batch_detail_screen.dart';
+import 'package:jusel_app/core/utils/navigation_helper.dart';
 
-class StockHistoryScreen extends StatefulWidget {
+final stockMovementsProvider = FutureProvider.autoDispose
+    .family<List<StockMovementsTableData>, String>((ref, productId) async {
+      final db = ref.read(appDatabaseProvider);
+      return db.stockMovementsDao.getMovementsForProduct(productId);
+    });
+
+class StockHistoryScreen extends ConsumerStatefulWidget {
+  final String productId;
   final String productName;
   final int currentStock;
   final String? imageAsset;
 
   const StockHistoryScreen({
     super.key,
+    required this.productId,
     required this.productName,
     required this.currentStock,
     this.imageAsset,
   });
 
   @override
-  State<StockHistoryScreen> createState() => _StockHistoryScreenState();
+  ConsumerState<StockHistoryScreen> createState() => _StockHistoryScreenState();
 }
 
-class _StockHistoryScreenState extends State<StockHistoryScreen> {
+class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
   String _selectedFilter = 'All';
 
   @override
   Widget build(BuildContext context) {
-    final movements = _sampleMovements()
-        .where((m) => _selectedFilter == 'All' || m.type == _selectedFilter)
-        .toList();
+    final movementsAsync = ref.watch(stockMovementsProvider(widget.productId));
+
     return Scaffold(
       backgroundColor: JuselColors.background,
       appBar: AppBar(
@@ -43,7 +54,8 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
             ),
             child: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () =>
+                  safePop(context, fallbackRoute: '/boss-dashboard'),
             ),
           ),
         ),
@@ -123,120 +135,96 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                 ),
               ),
               const SizedBox(height: JuselSpacing.s16),
-              _DaySection(
-                title: 'Today',
-                items: movements
-                    .where((m) => m.dayGroup == 'today')
-                    .map(_MovementCard.new)
-                    .toList(),
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              _DaySection(
-                title: 'Yesterday',
-                items: movements
-                    .where((m) => m.dayGroup == 'yesterday')
-                    .map(_MovementCard.new)
-                    .toList(),
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              _DaySection(
-                title: 'Last Week',
-                items: movements
-                    .where((m) => m.dayGroup == 'last_week')
-                    .map(_MovementCard.new)
-                    .toList(),
+              movementsAsync.when(
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: JuselSpacing.s24),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: JuselSpacing.s16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Failed to load movements',
+                        style: JuselTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.destructive,
+                        ),
+                      ),
+                      const SizedBox(height: JuselSpacing.s8),
+                      Text(
+                        e.toString(),
+                        style: JuselTextStyles.bodySmall.copyWith(
+                          color: JuselColors.mutedForeground,
+                        ),
+                      ),
+                      const SizedBox(height: JuselSpacing.s12),
+                      OutlinedButton(
+                        onPressed: () => ref.refresh(
+                          stockMovementsProvider(widget.productId),
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+                data: (movements) {
+                  final filtered = movements.where((m) {
+                    if (_selectedFilter == 'All') return true;
+                    return _filterLabelForType(m.type) == _selectedFilter;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(JuselSpacing.s16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: JuselColors.border),
+                      ),
+                      child: Text(
+                        'No stock movements yet.',
+                        style: JuselTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: JuselColors.mutedForeground,
+                        ),
+                      ),
+                    );
+                  }
+
+                  final grouped = _groupByDay(filtered);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: grouped.entries
+                        .map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: JuselSpacing.s12,
+                            ),
+                            child: _DaySection(
+                              title: entry.key,
+                              items: entry.value
+                                  .map((m) => _MovementCard(m))
+                                  .toList(),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
               ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  List<_Movement> _sampleMovements() {
-    // Static sample data to mirror the design; hook to real data later.
-    return const [
-      _Movement(
-        title: 'Sale #1024',
-        subtitle: '10:30 AM • Apprentice',
-        type: 'Sales',
-        badge: Icons.shopping_cart_outlined,
-        badgeColor: Color(0xFFFFE4E6),
-        badgeIconColor: JuselColors.destructive,
-        delta: -2,
-        unitLabel: 'units',
-        dayGroup: 'today',
-      ),
-      _Movement(
-        title: 'Production',
-        subtitle: '08:30 AM • Boss',
-        type: 'Production',
-        badge: Icons.inventory_2_outlined,
-        badgeColor: Color(0xFFE8F1FF),
-        badgeIconColor: JuselColors.primary,
-        delta: 20,
-        helper: 'Batch #104',
-        trailingHelper: '\$0.73 / unit',
-        dayGroup: 'today',
-        batchCode: 'Batch #104',
-      ),
-      _Movement(
-        title: 'Restock',
-        subtitle: '08:10 AM • Boss',
-        type: 'Restocks',
-        badge: Icons.inventory_outlined,
-        badgeColor: Color(0xFFE9FBE7),
-        badgeIconColor: JuselColors.success,
-        delta: 60,
-        helper: 'Added new stock',
-        dayGroup: 'today',
-      ),
-      _Movement(
-        title: 'Wastage',
-        subtitle: '06:15 PM • Boss',
-        type: 'Adjustments',
-        badge: Icons.delete_outline,
-        badgeColor: Color(0xFFFFEDE5),
-        badgeIconColor: Color(0xFFF97316),
-        delta: -5,
-        helper: 'Spilled during transfer',
-        dayGroup: 'yesterday',
-      ),
-      _Movement(
-        title: 'Sale #1021',
-        subtitle: '02:30 PM • Apprentice',
-        type: 'Sales',
-        badge: Icons.shopping_cart_outlined,
-        badgeColor: Color(0xFFFFE4E6),
-        badgeIconColor: JuselColors.destructive,
-        delta: -8,
-        dayGroup: 'yesterday',
-      ),
-      _Movement(
-        title: 'Inventory Check',
-        subtitle: 'Mon, 9:00 AM • Boss',
-        type: 'Adjustments',
-        badge: Icons.tune,
-        badgeColor: Color(0xFFE8F1FF),
-        badgeIconColor: Color(0xFF6B7280),
-        delta: 2,
-        helper: 'Found extra stock',
-        dayGroup: 'last_week',
-      ),
-      _Movement(
-        title: 'Production',
-        subtitle: 'Oct 12 • Boss',
-        type: 'Production',
-        badge: Icons.inventory_2_outlined,
-        badgeColor: Color(0xFFE8F1FF),
-        badgeIconColor: JuselColors.primary,
-        delta: 50,
-        helper: 'Batch #103',
-        trailingHelper: '\$0.64 / unit',
-        dayGroup: 'last_week',
-        batchCode: 'Batch #103',
-      ),
-    ];
   }
 }
 
@@ -274,49 +262,23 @@ class _DaySection extends StatelessWidget {
 }
 
 class _MovementCard extends StatelessWidget {
-  final _Movement movement;
+  final StockMovementsTableData movement;
   const _MovementCard(this.movement);
-
-  void _openBatch(BuildContext context) {
-    if (movement.batchCode == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BatchDetailScreen(
-          batchCode: movement.batchCode!,
-          productName: 'Homemade Lemonade',
-          badgeLabel: 'Local Drink',
-          producedAt: DateTime(2023, 10, 12, 8, 30),
-          supplier: 'Fresh Farms Ltd',
-          producedUnits: 20,
-          stockAdded: 20,
-          totalCost: 14.60,
-          unitCost: 0.73,
-          unitCostChangePercent: -4,
-          estimatedRevenue: 29.20,
-          estimatedMarginPercent: 50.0,
-          costBreakdown: const {
-            'Ingredients': 10.00,
-            'Packaging': 2.00,
-            'Labor': 1.60,
-            'Gas': 1.00,
-          },
-          notes:
-              'Production ran smoothly. New lemon supplier tested for this batch, acidity is slightly higher.',
-          relatedMovementLabel: 'Movement #542',
-          relatedMovementDelta: 20,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    final deltaColor = movement.delta >= 0
+    final meta = _movementMeta(movement);
+    final deltaColor = meta.isAddition
         ? JuselColors.success
         : JuselColors.destructive;
-    final deltaPrefix = movement.delta > 0 ? '+' : '';
-    final card = Container(
+    final deltaPrefix = meta.isAddition ? '+' : '-';
+    final reasonText = movement.reason != null && movement.reason!.isNotEmpty
+        ? ' - ${movement.reason!.replaceAll('_', ' ')}'
+        : '';
+    final subtitle =
+        '${DateFormat('MMM d, h:mm a').format(movement.createdAt)}$reasonText';
+
+    return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF7FAFF),
         borderRadius: BorderRadius.circular(14),
@@ -330,10 +292,10 @@ class _MovementCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: movement.badgeColor,
+              color: meta.badgeColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(movement.badge, color: movement.badgeIconColor),
+            child: Icon(meta.badge, color: meta.badgeIconColor),
           ),
           const SizedBox(width: JuselSpacing.s12),
           Expanded(
@@ -341,7 +303,7 @@ class _MovementCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  movement.title,
+                  meta.title,
                   style: JuselTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w700,
                     color: JuselColors.foreground,
@@ -349,40 +311,30 @@ class _MovementCard extends StatelessWidget {
                 ),
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
-                  movement.subtitle,
+                  subtitle,
                   style: JuselTextStyles.bodySmall.copyWith(
                     color: JuselColors.mutedForeground,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                if (movement.helper != null) ...[
+                if (movement.reason != null &&
+                    movement.reason!.trim().isNotEmpty) ...[
                   const SizedBox(height: JuselSpacing.s6),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: movement.batchCode != null
-                        ? () => _openBatch(context)
-                        : null,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: JuselSpacing.s12,
-                        vertical: JuselSpacing.s6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: JuselColors.border),
-                      ),
-                      child: Text(
-                        movement.helper!,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: movement.batchCode != null
-                              ? JuselColors.primary
-                              : JuselColors.foreground,
-                          fontWeight: FontWeight.w700,
-                          decoration: movement.batchCode != null
-                              ? TextDecoration.underline
-                              : null,
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: JuselSpacing.s12,
+                      vertical: JuselSpacing.s6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: JuselColors.border),
+                    ),
+                    child: Text(
+                      movement.reason!,
+                      style: JuselTextStyles.bodySmall.copyWith(
+                        color: JuselColors.foreground,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -395,35 +347,17 @@ class _MovementCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '$deltaPrefix${movement.delta}',
+                '$deltaPrefix${meta.displayDelta}',
                 style: JuselTextStyles.bodyMedium.copyWith(
                   color: deltaColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (movement.trailingHelper != null) ...[
-                const SizedBox(height: JuselSpacing.s6),
-                Text(
-                  movement.trailingHelper!,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
             ],
           ),
         ],
       ),
     );
-    if (movement.batchCode != null) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _openBatch(context),
-        child: card,
-      );
-    }
-    return card;
   }
 }
 
@@ -467,36 +401,6 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _Movement {
-  final String title;
-  final String subtitle;
-  final String type;
-  final IconData badge;
-  final Color badgeColor;
-  final Color badgeIconColor;
-  final int delta;
-  final String? helper;
-  final String? trailingHelper;
-  final String dayGroup;
-  final String unitLabel;
-  final String? batchCode;
-
-  const _Movement({
-    required this.title,
-    required this.subtitle,
-    required this.type,
-    required this.badge,
-    required this.badgeColor,
-    required this.badgeIconColor,
-    required this.delta,
-    this.helper,
-    this.trailingHelper,
-    required this.dayGroup,
-    this.unitLabel = 'Units',
-    this.batchCode,
-  });
-}
-
 class _ProductThumbnail extends StatelessWidget {
   final String? imageAsset;
   const _ProductThumbnail({required this.imageAsset});
@@ -521,4 +425,148 @@ class _ProductThumbnail extends StatelessWidget {
           : null,
     );
   }
+}
+
+class _MovementMeta {
+  final String title;
+  final IconData badge;
+  final Color badgeColor;
+  final Color badgeIconColor;
+  final bool isAddition;
+  final int displayDelta;
+
+  const _MovementMeta({
+    required this.title,
+    required this.badge,
+    required this.badgeColor,
+    required this.badgeIconColor,
+    required this.isAddition,
+    required this.displayDelta,
+  });
+}
+
+String _filterLabelForType(String type) {
+  switch (type) {
+    case 'sale':
+      return 'Sales';
+    case 'stock_in':
+      return 'Restocks';
+    case 'production_output':
+      return 'Production';
+    case 'stock_out':
+    case 'adjustment':
+    case 'wastage':
+    case 'return':
+      return 'Adjustments';
+    default:
+      return 'Adjustments';
+  }
+}
+
+Map<String, List<StockMovementsTableData>> _groupByDay(
+  List<StockMovementsTableData> movements,
+) {
+  final Map<String, List<StockMovementsTableData>> grouped = {};
+  for (final movement in movements) {
+    final label = _dayLabel(movement.createdAt);
+    grouped.putIfAbsent(label, () => []).add(movement);
+  }
+  return grouped;
+}
+
+String _dayLabel(DateTime date) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final dateOnly = DateTime(date.year, date.month, date.day);
+
+  if (dateOnly == today) return 'Today';
+  if (dateOnly == today.subtract(const Duration(days: 1))) {
+    return 'Yesterday';
+  }
+  return DateFormat('MMM d, yyyy').format(date);
+}
+
+_MovementMeta _movementMeta(StockMovementsTableData movement) {
+  final filterLabel = _filterLabelForType(movement.type);
+  final absQuantity = movement.quantityUnits.abs();
+
+  bool isAddition;
+  IconData icon;
+  Color badgeColor;
+  Color badgeIconColor;
+  String title;
+
+  switch (movement.type) {
+    case 'sale':
+      isAddition = false;
+      icon = Icons.shopping_cart_outlined;
+      badgeColor = const Color(0xFFFFE4E6);
+      badgeIconColor = JuselColors.destructive;
+      title = 'Sale';
+      break;
+    case 'stock_in':
+      isAddition = true;
+      icon = Icons.inventory_outlined;
+      badgeColor = const Color(0xFFE9FBE7);
+      badgeIconColor = JuselColors.success;
+      title = 'Restock';
+      break;
+    case 'production_output':
+      isAddition = true;
+      icon = Icons.inventory_2_outlined;
+      badgeColor = const Color(0xFFE8F1FF);
+      badgeIconColor = JuselColors.primary;
+      title = 'Production';
+      break;
+    case 'stock_out':
+      isAddition = false;
+      icon = Icons.outbox_outlined;
+      badgeColor = const Color(0xFFFFF1F2);
+      badgeIconColor = JuselColors.destructive;
+      title = 'Stock Out';
+      break;
+    case 'adjustment':
+      isAddition = movement.quantityUnits >= 0;
+      icon = Icons.tune;
+      badgeColor = const Color(0xFFE8F1FF);
+      badgeIconColor = const Color(0xFF6B7280);
+      title = 'Adjustment';
+      break;
+    case 'wastage':
+      isAddition = false;
+      icon = Icons.delete_outline;
+      badgeColor = const Color(0xFFFFEDE5);
+      badgeIconColor = const Color(0xFFF97316);
+      title = 'Wastage';
+      break;
+    case 'return':
+      isAddition = true;
+      icon = Icons.reply_outlined;
+      badgeColor = const Color(0xFFE8F1FF);
+      badgeIconColor = JuselColors.primary;
+      title = 'Return';
+      break;
+    default:
+      isAddition = movement.quantityUnits >= 0;
+      icon = Icons.history;
+      badgeColor = const Color(0xFFE5E7EB);
+      badgeIconColor = JuselColors.mutedForeground;
+      title = filterLabel;
+      break;
+  }
+
+  if (movement.quantityUnits < 0) {
+    isAddition = false;
+  }
+
+  final displayDelta = absQuantity;
+
+  return _MovementMeta(
+    title: title,
+    badge: icon,
+    badgeColor: badgeColor,
+    badgeIconColor: badgeIconColor,
+    isAddition: isAddition,
+    displayDelta: displayDelta,
+  );
 }
