@@ -6,6 +6,7 @@ import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
+import 'package:jusel_app/features/products/view/edit_product_screen.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
 
 final productDetailProvider = FutureProvider.autoDispose
@@ -271,7 +272,22 @@ class ProductDetailScreen extends ConsumerWidget {
                 const SizedBox(height: JuselSpacing.s12),
                 Column(
                   children: [
-                    _NavTile(label: 'Edit Product', onTap: () {}),
+                    _NavTile(
+                      label: 'Edit Product',
+                      onTap: () async {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => EditProductScreen(
+                              productId: product.id,
+                            ),
+                          ),
+                        );
+                        // Refresh product data if edit was successful
+                        if (result == true) {
+                          ref.invalidate(productDetailProvider(productId));
+                        }
+                      },
+                    ),
                     const SizedBox(height: JuselSpacing.s12),
                     _NavTile(label: 'View Stock Movements', onTap: () {}),
                   ],
