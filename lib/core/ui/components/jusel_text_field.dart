@@ -41,7 +41,7 @@ class _JuselTextFieldState extends State<JuselTextField> {
       children: [
         Text(
           widget.label,
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: FontWeight.w500,
           ),
         ),

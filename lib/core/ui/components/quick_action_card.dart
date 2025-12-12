@@ -19,15 +19,17 @@ class QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        gradientColors ??
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = JuselColors.primaryColor(context);
+    
+    final colors = gradientColors ??
         [
-          JuselColors.primary.withOpacity(0.12),
-          JuselColors.primary.withOpacity(0.06),
+          primaryColor.withOpacity(isDark ? 0.2 : 0.12),
+          primaryColor.withOpacity(isDark ? 0.1 : 0.06),
         ];
 
     return Material(
-      color: Colors.white,
+      color: JuselColors.card(context),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -41,7 +43,7 @@ class QuickActionCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: JuselColors.border.withOpacity(0.9),
+              color: JuselColors.border(context).withOpacity(0.9),
               width: 1.1,
             ),
           ),
@@ -55,14 +57,16 @@ class QuickActionCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: LinearGradient(colors: colors),
                 ),
-                child: Icon(icon, color: iconColor ?? JuselColors.primary),
+                child: Icon(
+                  icon,
+                  color: iconColor ?? primaryColor,
+                ),
               ),
               const SizedBox(height: JuselSpacing.s12),
               Text(
                 label,
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w600,
-                  color: JuselColors.foreground,
                 ),
               ),
             ],

@@ -17,6 +17,7 @@ import 'package:jusel_app/features/sales/view/sales_screen.dart';
 class SalesCompletedScreen extends ConsumerStatefulWidget {
   final List<CartItem> items;
   final double subtotal;
+  final double netProfit;
   final String sellerName;
   final String paymentMethod;
   final String? receiptNumber;
@@ -26,6 +27,7 @@ class SalesCompletedScreen extends ConsumerStatefulWidget {
     super.key,
     required this.items,
     required this.subtotal,
+    required this.netProfit,
     required this.sellerName,
     required this.paymentMethod,
     String? receiptNumber,
@@ -55,7 +57,7 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
@@ -65,24 +67,24 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE9FBE7),
+                decoration: BoxDecoration(
+                  color: JuselColors.successColor(context).withOpacity(0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, color: JuselColors.success),
+                child: Icon(Icons.check, color: JuselColors.successColor(context)),
               ),
               const SizedBox(height: JuselSpacing.s12),
               Text(
                 'Sale Completed!',
-                style: JuselTextStyles.headlineMedium.copyWith(
+                style: JuselTextStyles.headlineMedium(context).copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: JuselSpacing.s6),
               Text(
                 'Transaction has been recorded successfully.',
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -121,9 +123,9 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        side: const BorderSide(color: JuselColors.border),
-                        backgroundColor: Colors.white,
-                        foregroundColor: JuselColors.foreground,
+                        side: BorderSide(color: JuselColors.border(context)),
+                        backgroundColor: JuselColors.card(context),
+                        foregroundColor: JuselColors.foreground(context),
                       ),
                     ),
                   ),
@@ -149,16 +151,16 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        side: const BorderSide(color: JuselColors.border),
-                        backgroundColor: Colors.white,
-                        foregroundColor: JuselColors.foreground,
+                        side: BorderSide(color: JuselColors.border(context)),
+                        backgroundColor: JuselColors.card(context),
+                        foregroundColor: JuselColors.foreground(context),
                       ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: JuselSpacing.s12),
-              _BossInsights(total: _total),
+              _BossInsights(total: _total, netProfit: widget.netProfit),
               const SizedBox(height: JuselSpacing.s16),
               SizedBox(
                 width: double.infinity,
@@ -179,8 +181,8 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
                     padding: const EdgeInsets.symmetric(
                       vertical: JuselSpacing.s16,
                     ),
-                    backgroundColor: JuselColors.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: JuselColors.primaryColor(context),
+                    foregroundColor: JuselColors.primaryForeground,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -210,15 +212,15 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    backgroundColor: const Color(0xFFF4F7FB),
-                    side: const BorderSide(color: Color(0xFFF4F7FB)),
-                    foregroundColor: JuselColors.foreground,
+                    backgroundColor: JuselColors.muted(context),
+                    side: BorderSide(color: JuselColors.border(context)),
+                    foregroundColor: JuselColors.foreground(context),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Back to Dashboard',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                   ),
                 ),
@@ -306,7 +308,7 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to print: $e'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -325,7 +327,7 @@ class _SalesCompletedScreenState extends ConsumerState<SalesCompletedScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to share: $e'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -408,7 +410,7 @@ class _ReceiptCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: JuselSpacing.s12),
-            const Divider(height: 1, color: JuselColors.border),
+            Divider(height: 1, color: JuselColors.border(context)),
             const SizedBox(height: JuselSpacing.s12),
             ...items.map(
               (item) => Padding(
@@ -416,7 +418,7 @@ class _ReceiptCard extends StatelessWidget {
                 child: _ItemRow(item: item),
               ),
             ),
-            const Divider(height: 1, color: JuselColors.border),
+            Divider(height: 1, color: JuselColors.border(context)),
             const SizedBox(height: JuselSpacing.s12),
             _MoneyRow(label: 'Subtotal', amount: subtotal),
             const SizedBox(height: JuselSpacing.s6),
@@ -426,7 +428,7 @@ class _ReceiptCard extends StatelessWidget {
               label: 'Total Amount',
               amount: total,
               bold: true,
-              color: JuselColors.primary,
+              color: JuselColors.primaryColor(context),
             ),
           ],
         ),
@@ -462,6 +464,7 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final overridden = item.overriddenPrice != null;
+    final hasReason = item.overrideReason != null && item.overrideReason!.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -472,7 +475,7 @@ class _ItemRow extends StatelessWidget {
               children: [
                 Text(
                   item.productName,
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -484,13 +487,13 @@ class _ItemRow extends StatelessWidget {
                       vertical: JuselSpacing.s4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1F2),
+                      color: JuselColors.destructiveColor(context).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Overridden',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.destructive,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.destructiveColor(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -500,7 +503,7 @@ class _ItemRow extends StatelessWidget {
             ),
             Text(
               'GHS ${item.total.toStringAsFixed(2)}',
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -512,22 +515,44 @@ class _ItemRow extends StatelessWidget {
           children: [
             Text(
               '${item.quantity} x GHS ${item.effectivePrice.toStringAsFixed(2)}',
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
             if (overridden)
               Text(
                 'GHS ${item.unitPrice.toStringAsFixed(2)}',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   decoration: TextDecoration.lineThrough,
                   fontWeight: FontWeight.w600,
                 ),
               ),
           ],
         ),
+        if (hasReason) ...[
+          const SizedBox(height: JuselSpacing.s4),
+          Row(
+            children: [
+              Icon(
+                Icons.note_alt_outlined,
+                size: 14,
+                color: JuselColors.primaryColor(context),
+              ),
+              const SizedBox(width: JuselSpacing.s6),
+              Expanded(
+                child: Text(
+                  'Reason: ${item.overrideReason}',
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -552,15 +577,15 @@ class _LabelValue extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: JuselSpacing.s4),
         Text(
           value,
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -589,15 +614,15 @@ class _MoneyRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
           ),
         ),
         Text(
           'GHS ${amount.toStringAsFixed(2)}',
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
-            color: color ?? JuselColors.foreground,
+            color: color ?? JuselColors.foreground(context),
           ),
         ),
       ],
@@ -607,7 +632,8 @@ class _MoneyRow extends StatelessWidget {
 
 class _BossInsights extends StatelessWidget {
   final double total;
-  const _BossInsights({required this.total});
+  final double netProfit;
+  const _BossInsights({required this.total, required this.netProfit});
 
   @override
   Widget build(BuildContext context) {
@@ -615,9 +641,9 @@ class _BossInsights extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: JuselColors.warningColor(context).withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF7E5B5)),
+        border: Border.all(color: JuselColors.warningColor(context).withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -627,22 +653,22 @@ class _BossInsights extends StatelessWidget {
               vertical: JuselSpacing.s6,
             ),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: JuselColors.card(context),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.bar_chart,
-                  color: JuselColors.primary,
+                  color: JuselColors.primaryColor(context),
                   size: 18,
                 ),
                 const SizedBox(width: JuselSpacing.s6),
                 Text(
                   'Boss Insights',
-                  style: JuselTextStyles.bodySmall.copyWith(
+                  style: JuselTextStyles.bodySmall(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                   ),
                 ),
               ],
@@ -654,14 +680,14 @@ class _BossInsights extends StatelessWidget {
             children: [
               Text(
                 'Total Amount',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 'GHS ${total.toStringAsFixed(2)}',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -673,16 +699,16 @@ class _BossInsights extends StatelessWidget {
             children: [
               Text(
                 'Net Profit',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
-                'N/A',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                'GHS ${netProfit.toStringAsFixed(2)}',
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w800,
-                  color: JuselColors.success,
+                  color: netProfit >= 0 ? JuselColors.successColor(context) : JuselColors.destructiveColor(context),
                 ),
               ),
             ],

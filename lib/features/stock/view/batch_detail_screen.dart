@@ -6,7 +6,6 @@ import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/stock/view/stock_history_screen.dart';
-import 'package:jusel_app/core/utils/navigation_helper.dart';
 
 final batchDetailProvider = FutureProvider.autoDispose
     .family<_BatchDetailData, int>((ref, batchId) async {
@@ -46,22 +45,22 @@ class BatchDetailScreen extends ConsumerWidget {
     final detail = ref.watch(batchDetailProvider(batchId));
 
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: JuselColors.background,
-        shape: const Border(bottom: BorderSide(color: JuselColors.border)),
+        backgroundColor: JuselColors.background(context),
+        shape: Border(bottom: BorderSide(color: JuselColors.border(context))),
         leadingWidth: 64,
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Container(
-            decoration: const BoxDecoration(
-              color: JuselColors.muted,
+            decoration: BoxDecoration(
+              color: JuselColors.muted(context),
               shape: BoxShape.circle,
             ),
             child: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ),
         ),
@@ -99,7 +98,7 @@ class BatchDetailScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Batch #${batch.id}',
-                          style: JuselTextStyles.headlineMedium.copyWith(
+                          style: JuselTextStyles.headlineMedium(context).copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -110,13 +109,13 @@ class BatchDetailScreen extends ConsumerWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE9F0FF),
+                          color: JuselColors.primaryColor(context).withOpacity(0.08),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           badgeLabel.toUpperCase(),
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.primary,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.primaryColor(context),
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -126,16 +125,16 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s8),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.calendar_today,
                         size: 16,
-                        color: JuselColors.mutedForeground,
+                        color: JuselColors.mutedForeground(context),
                       ),
                       const SizedBox(width: JuselSpacing.s6),
                       Text(
                         dateString,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -144,17 +143,17 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s8),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.inventory_2_outlined,
                         size: 16,
-                        color: JuselColors.mutedForeground,
+                        color: JuselColors.mutedForeground(context),
                       ),
                       const SizedBox(width: JuselSpacing.s6),
                       Flexible(
                         child: Text(
                           product.name,
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.foreground,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.foreground(context),
                             fontWeight: FontWeight.w700,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -168,12 +167,12 @@ class BatchDetailScreen extends ConsumerWidget {
                       _StatItem(
                         label: 'Produced',
                         value: '${batch.quantityProduced} units',
-                        valueColor: JuselColors.primary,
+                        valueColor: JuselColors.primaryColor(context),
                       ),
                       _StatItem(
                         label: 'Stock Add',
                         value: '+${batch.quantityProduced}',
-                        valueColor: JuselColors.success,
+                        valueColor: JuselColors.successColor(context),
                       ),
                       _StatItem(
                         label: 'Total Cost',
@@ -184,7 +183,7 @@ class BatchDetailScreen extends ConsumerWidget {
                         label: 'Unit Cost',
                         value: 'GHS ${batch.unitCost.toStringAsFixed(2)}',
                         helper: 'Snapshot',
-                        helperColor: JuselColors.mutedForeground,
+                        helperColor: JuselColors.mutedForeground(context),
                         showArrow: false,
                       ),
                     ],
@@ -192,8 +191,8 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s16),
                   Text(
                     'COST BREAKDOWN',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.2,
                     ),
@@ -201,9 +200,9 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s8),
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: JuselColors.card(context),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: JuselColors.border),
+                      border: Border.all(color: JuselColors.border(context)),
                     ),
                     child: Column(
                       children: [
@@ -221,14 +220,14 @@ class BatchDetailScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       entry.key,
-                                      style: JuselTextStyles.bodyMedium
+                                      style: JuselTextStyles.bodyMedium(context)
                                           .copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
                                     Text(
                                       'GHS ${entry.value.toStringAsFixed(2)}',
-                                      style: JuselTextStyles.bodyMedium
+                                      style: JuselTextStyles.bodyMedium(context)
                                           .copyWith(
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -237,9 +236,9 @@ class BatchDetailScreen extends ConsumerWidget {
                                 ),
                               ),
                               if (entry.key != costBreakdown.keys.last)
-                                const Divider(
+                                Divider(
                                   height: 1,
-                                  color: JuselColors.border,
+                                  color: JuselColors.border(context),
                                 ),
                             ],
                           ),
@@ -250,8 +249,8 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s16),
                   Text(
                     'NOTES',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.2,
                     ),
@@ -261,16 +260,16 @@ class BatchDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(JuselSpacing.s12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: JuselColors.card(context),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: JuselColors.border),
+                      border: Border.all(color: JuselColors.border(context)),
                     ),
                     child: Text(
                       (batch.notes ?? '').isEmpty
                           ? 'No notes added.'
                           : batch.notes!,
-                      style: JuselTextStyles.bodyMedium.copyWith(
-                        color: JuselColors.foreground,
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
+                        color: JuselColors.foreground(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -278,8 +277,8 @@ class BatchDetailScreen extends ConsumerWidget {
                   const SizedBox(height: JuselSpacing.s16),
                   Text(
                     'RELATED MOVEMENT',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.2,
                     ),
@@ -290,21 +289,21 @@ class BatchDetailScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(JuselSpacing.s12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: JuselColors.card(context),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: JuselColors.border),
+                        border: Border.all(color: JuselColors.border(context)),
                       ),
                       child: Text(
                         'No related movement found.',
-                        style: JuselTextStyles.bodyMedium.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     )
                   else
                     Material(
-                      color: Colors.white,
+                      color: JuselColors.card(context),
                       borderRadius: BorderRadius.circular(14),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(14),
@@ -323,7 +322,7 @@ class BatchDetailScreen extends ConsumerWidget {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: JuselColors.border),
+                            border: Border.all(color: JuselColors.border(context)),
                           ),
                           padding: const EdgeInsets.all(JuselSpacing.s12),
                           child: Row(
@@ -332,12 +331,12 @@ class BatchDetailScreen extends ConsumerWidget {
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE9F0FF),
+                                  color: JuselColors.primaryColor(context).withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.swap_horiz,
-                                  color: JuselColors.primary,
+                                  color: JuselColors.primaryColor(context),
                                 ),
                               ),
                               const SizedBox(width: JuselSpacing.s12),
@@ -347,7 +346,7 @@ class BatchDetailScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       'Movement ${movement.id}',
-                                      style: JuselTextStyles.bodyMedium
+                                      style: JuselTextStyles.bodyMedium(context)
                                           .copyWith(
                                             fontWeight: FontWeight.w700,
                                           ),
@@ -355,17 +354,17 @@ class BatchDetailScreen extends ConsumerWidget {
                                     const SizedBox(height: JuselSpacing.s4),
                                     Text(
                                       'Stock Update · ${movement.quantityUnits > 0 ? '+' : ''}${movement.quantityUnits} units',
-                                      style: JuselTextStyles.bodySmall.copyWith(
-                                        color: JuselColors.mutedForeground,
+                                      style: JuselTextStyles.bodySmall(context).copyWith(
+                                        color: JuselColors.mutedForeground(context),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const Icon(
+                              Icon(
                                 Icons.chevron_right,
-                                color: JuselColors.mutedForeground,
+                                color: JuselColors.mutedForeground(context),
                               ),
                             ],
                           ),
@@ -395,21 +394,21 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: JuselColors.destructive),
+            Icon(Icons.error_outline, color: JuselColors.destructiveColor(context)),
             const SizedBox(height: JuselSpacing.s8),
             Text(
               'Failed to load batch',
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w700,
-                color: JuselColors.destructive,
+                color: JuselColors.destructiveColor(context),
               ),
             ),
             const SizedBox(height: JuselSpacing.s6),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           ],
@@ -498,26 +497,26 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: JuselColors.border),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             item.label,
-            style: JuselTextStyles.bodySmall.copyWith(
-              color: JuselColors.mutedForeground,
+            style: JuselTextStyles.bodySmall(context).copyWith(
+              color: JuselColors.mutedForeground(context),
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: JuselSpacing.s6),
           Text(
             item.value,
-            style: JuselTextStyles.bodyMedium.copyWith(
+            style: JuselTextStyles.bodyMedium(context).copyWith(
               fontWeight: item.bold ? FontWeight.w800 : FontWeight.w700,
-              color: item.valueColor ?? JuselColors.foreground,
+              color: item.valueColor ?? JuselColors.foreground(context),
             ),
           ),
           if (item.helper != null) ...[
@@ -529,7 +528,7 @@ class _StatCard extends StatelessWidget {
                   Icon(
                     Icons.arrow_downward,
                     size: 14,
-                    color: item.helperColor ?? JuselColors.success,
+                    color: item.helperColor ?? JuselColors.successColor(context),
                   ),
                 if (item.showArrow) const SizedBox(width: 4),
                 Container(
@@ -538,13 +537,13 @@ class _StatCard extends StatelessWidget {
                     vertical: JuselSpacing.s4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE9FBE7),
+                    color: JuselColors.successColor(context).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     item.helper!,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: item.helperColor ?? JuselColors.success,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: item.helperColor ?? JuselColors.successColor(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),

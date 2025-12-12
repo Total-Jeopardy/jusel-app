@@ -547,6 +547,17 @@ class $ProductsTableTable extends ProductsTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isProducedMeta = const VerificationMeta(
     'isProduced',
   );
@@ -579,9 +590,9 @@ class $ProductsTableTable extends ProductsTable
   late final GeneratedColumn<double> currentCostPrice = GeneratedColumn<double>(
     'current_cost_price',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.double,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _currentStockQtyMeta = const VerificationMeta(
     'currentStockQty',
@@ -644,6 +655,7 @@ class $ProductsTableTable extends ProductsTable
     name,
     category,
     subcategory,
+    imageUrl,
     isProduced,
     currentSellingPrice,
     currentCostPrice,
@@ -695,6 +707,12 @@ class $ProductsTableTable extends ProductsTable
         ),
       );
     }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    }
     if (data.containsKey('is_produced')) {
       context.handle(
         _isProducedMeta,
@@ -722,8 +740,6 @@ class $ProductsTableTable extends ProductsTable
           _currentCostPriceMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_currentCostPriceMeta);
     }
     if (data.containsKey('current_stock_qty')) {
       context.handle(
@@ -788,6 +804,10 @@ class $ProductsTableTable extends ProductsTable
         DriftSqlType.string,
         data['${effectivePrefix}subcategory'],
       ),
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      ),
       isProduced: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_produced'],
@@ -799,7 +819,7 @@ class $ProductsTableTable extends ProductsTable
       currentCostPrice: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}current_cost_price'],
-      )!,
+      ),
       currentStockQty: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}current_stock_qty'],
@@ -835,9 +855,10 @@ class ProductsTableData extends DataClass
   final String name;
   final String category;
   final String? subcategory;
+  final String? imageUrl;
   final bool isProduced;
   final double currentSellingPrice;
-  final double currentCostPrice;
+  final double? currentCostPrice;
   final int currentStockQty;
   final int? unitsPerPack;
   final String status;
@@ -848,9 +869,10 @@ class ProductsTableData extends DataClass
     required this.name,
     required this.category,
     this.subcategory,
+    this.imageUrl,
     required this.isProduced,
     required this.currentSellingPrice,
-    required this.currentCostPrice,
+    this.currentCostPrice,
     required this.currentStockQty,
     this.unitsPerPack,
     required this.status,
@@ -866,9 +888,14 @@ class ProductsTableData extends DataClass
     if (!nullToAbsent || subcategory != null) {
       map['subcategory'] = Variable<String>(subcategory);
     }
+    if (!nullToAbsent || imageUrl != null) {
+      map['image_url'] = Variable<String>(imageUrl);
+    }
     map['is_produced'] = Variable<bool>(isProduced);
     map['current_selling_price'] = Variable<double>(currentSellingPrice);
-    map['current_cost_price'] = Variable<double>(currentCostPrice);
+    if (!nullToAbsent || currentCostPrice != null) {
+      map['current_cost_price'] = Variable<double>(currentCostPrice);
+    }
     map['current_stock_qty'] = Variable<int>(currentStockQty);
     if (!nullToAbsent || unitsPerPack != null) {
       map['units_per_pack'] = Variable<int>(unitsPerPack);
@@ -889,9 +916,14 @@ class ProductsTableData extends DataClass
       subcategory: subcategory == null && nullToAbsent
           ? const Value.absent()
           : Value(subcategory),
+      imageUrl: imageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imageUrl),
       isProduced: Value(isProduced),
       currentSellingPrice: Value(currentSellingPrice),
-      currentCostPrice: Value(currentCostPrice),
+      currentCostPrice: currentCostPrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(currentCostPrice),
       currentStockQty: Value(currentStockQty),
       unitsPerPack: unitsPerPack == null && nullToAbsent
           ? const Value.absent()
@@ -914,11 +946,12 @@ class ProductsTableData extends DataClass
       name: serializer.fromJson<String>(json['name']),
       category: serializer.fromJson<String>(json['category']),
       subcategory: serializer.fromJson<String?>(json['subcategory']),
+      imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       isProduced: serializer.fromJson<bool>(json['isProduced']),
       currentSellingPrice: serializer.fromJson<double>(
         json['currentSellingPrice'],
       ),
-      currentCostPrice: serializer.fromJson<double>(json['currentCostPrice']),
+      currentCostPrice: serializer.fromJson<double?>(json['currentCostPrice']),
       currentStockQty: serializer.fromJson<int>(json['currentStockQty']),
       unitsPerPack: serializer.fromJson<int?>(json['unitsPerPack']),
       status: serializer.fromJson<String>(json['status']),
@@ -934,9 +967,10 @@ class ProductsTableData extends DataClass
       'name': serializer.toJson<String>(name),
       'category': serializer.toJson<String>(category),
       'subcategory': serializer.toJson<String?>(subcategory),
+      'imageUrl': serializer.toJson<String?>(imageUrl),
       'isProduced': serializer.toJson<bool>(isProduced),
       'currentSellingPrice': serializer.toJson<double>(currentSellingPrice),
-      'currentCostPrice': serializer.toJson<double>(currentCostPrice),
+      'currentCostPrice': serializer.toJson<double?>(currentCostPrice),
       'currentStockQty': serializer.toJson<int>(currentStockQty),
       'unitsPerPack': serializer.toJson<int?>(unitsPerPack),
       'status': serializer.toJson<String>(status),
@@ -950,9 +984,10 @@ class ProductsTableData extends DataClass
     String? name,
     String? category,
     Value<String?> subcategory = const Value.absent(),
+    Value<String?> imageUrl = const Value.absent(),
     bool? isProduced,
     double? currentSellingPrice,
-    double? currentCostPrice,
+    Value<double?> currentCostPrice = const Value.absent(),
     int? currentStockQty,
     Value<int?> unitsPerPack = const Value.absent(),
     String? status,
@@ -963,9 +998,12 @@ class ProductsTableData extends DataClass
     name: name ?? this.name,
     category: category ?? this.category,
     subcategory: subcategory.present ? subcategory.value : this.subcategory,
+    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     isProduced: isProduced ?? this.isProduced,
     currentSellingPrice: currentSellingPrice ?? this.currentSellingPrice,
-    currentCostPrice: currentCostPrice ?? this.currentCostPrice,
+    currentCostPrice: currentCostPrice.present
+        ? currentCostPrice.value
+        : this.currentCostPrice,
     currentStockQty: currentStockQty ?? this.currentStockQty,
     unitsPerPack: unitsPerPack.present ? unitsPerPack.value : this.unitsPerPack,
     status: status ?? this.status,
@@ -980,6 +1018,7 @@ class ProductsTableData extends DataClass
       subcategory: data.subcategory.present
           ? data.subcategory.value
           : this.subcategory,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       isProduced: data.isProduced.present
           ? data.isProduced.value
           : this.isProduced,
@@ -1008,6 +1047,7 @@ class ProductsTableData extends DataClass
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('subcategory: $subcategory, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('isProduced: $isProduced, ')
           ..write('currentSellingPrice: $currentSellingPrice, ')
           ..write('currentCostPrice: $currentCostPrice, ')
@@ -1026,6 +1066,7 @@ class ProductsTableData extends DataClass
     name,
     category,
     subcategory,
+    imageUrl,
     isProduced,
     currentSellingPrice,
     currentCostPrice,
@@ -1043,6 +1084,7 @@ class ProductsTableData extends DataClass
           other.name == this.name &&
           other.category == this.category &&
           other.subcategory == this.subcategory &&
+          other.imageUrl == this.imageUrl &&
           other.isProduced == this.isProduced &&
           other.currentSellingPrice == this.currentSellingPrice &&
           other.currentCostPrice == this.currentCostPrice &&
@@ -1058,9 +1100,10 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   final Value<String> name;
   final Value<String> category;
   final Value<String?> subcategory;
+  final Value<String?> imageUrl;
   final Value<bool> isProduced;
   final Value<double> currentSellingPrice;
-  final Value<double> currentCostPrice;
+  final Value<double?> currentCostPrice;
   final Value<int> currentStockQty;
   final Value<int?> unitsPerPack;
   final Value<String> status;
@@ -1072,6 +1115,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     this.name = const Value.absent(),
     this.category = const Value.absent(),
     this.subcategory = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     this.isProduced = const Value.absent(),
     this.currentSellingPrice = const Value.absent(),
     this.currentCostPrice = const Value.absent(),
@@ -1087,9 +1131,10 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     required String name,
     required String category,
     this.subcategory = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     required bool isProduced,
     required double currentSellingPrice,
-    required double currentCostPrice,
+    this.currentCostPrice = const Value.absent(),
     this.currentStockQty = const Value.absent(),
     this.unitsPerPack = const Value.absent(),
     this.status = const Value.absent(),
@@ -1101,13 +1146,13 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
        category = Value(category),
        isProduced = Value(isProduced),
        currentSellingPrice = Value(currentSellingPrice),
-       currentCostPrice = Value(currentCostPrice),
        createdAt = Value(createdAt);
   static Insertable<ProductsTableData> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? category,
     Expression<String>? subcategory,
+    Expression<String>? imageUrl,
     Expression<bool>? isProduced,
     Expression<double>? currentSellingPrice,
     Expression<double>? currentCostPrice,
@@ -1123,6 +1168,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       if (name != null) 'name': name,
       if (category != null) 'category': category,
       if (subcategory != null) 'subcategory': subcategory,
+      if (imageUrl != null) 'image_url': imageUrl,
       if (isProduced != null) 'is_produced': isProduced,
       if (currentSellingPrice != null)
         'current_selling_price': currentSellingPrice,
@@ -1141,9 +1187,10 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     Value<String>? name,
     Value<String>? category,
     Value<String?>? subcategory,
+    Value<String?>? imageUrl,
     Value<bool>? isProduced,
     Value<double>? currentSellingPrice,
-    Value<double>? currentCostPrice,
+    Value<double?>? currentCostPrice,
     Value<int>? currentStockQty,
     Value<int?>? unitsPerPack,
     Value<String>? status,
@@ -1156,6 +1203,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       name: name ?? this.name,
       category: category ?? this.category,
       subcategory: subcategory ?? this.subcategory,
+      imageUrl: imageUrl ?? this.imageUrl,
       isProduced: isProduced ?? this.isProduced,
       currentSellingPrice: currentSellingPrice ?? this.currentSellingPrice,
       currentCostPrice: currentCostPrice ?? this.currentCostPrice,
@@ -1182,6 +1230,9 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     }
     if (subcategory.present) {
       map['subcategory'] = Variable<String>(subcategory.value);
+    }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
     }
     if (isProduced.present) {
       map['is_produced'] = Variable<bool>(isProduced.value);
@@ -1222,6 +1273,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('subcategory: $subcategory, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('isProduced: $isProduced, ')
           ..write('currentSellingPrice: $currentSellingPrice, ')
           ..write('currentCostPrice: $currentCostPrice, ')
@@ -1957,6 +2009,17 @@ class $StockMovementsTableTable extends StockMovementsTable
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _paymentMethodMeta = const VerificationMeta(
+    'paymentMethod',
+  );
+  @override
+  late final GeneratedColumn<String> paymentMethod = GeneratedColumn<String>(
+    'payment_method',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
   @override
   late final GeneratedColumn<String> reason = GeneratedColumn<String>(
@@ -2001,6 +2064,7 @@ class $StockMovementsTableTable extends StockMovementsTable
     sellingPricePerUnit,
     totalRevenue,
     profit,
+    paymentMethod,
     reason,
     createdByUserId,
     createdAt,
@@ -2103,6 +2167,15 @@ class $StockMovementsTableTable extends StockMovementsTable
         profit.isAcceptableOrUnknown(data['profit']!, _profitMeta),
       );
     }
+    if (data.containsKey('payment_method')) {
+      context.handle(
+        _paymentMethodMeta,
+        paymentMethod.isAcceptableOrUnknown(
+          data['payment_method']!,
+          _paymentMethodMeta,
+        ),
+      );
+    }
     if (data.containsKey('reason')) {
       context.handle(
         _reasonMeta,
@@ -2184,6 +2257,10 @@ class $StockMovementsTableTable extends StockMovementsTable
         DriftSqlType.double,
         data['${effectivePrefix}profit'],
       ),
+      paymentMethod: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_method'],
+      ),
       reason: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reason'],
@@ -2218,6 +2295,7 @@ class StockMovementsTableData extends DataClass
   final double? sellingPricePerUnit;
   final double? totalRevenue;
   final double? profit;
+  final String? paymentMethod;
   final String? reason;
   final String createdByUserId;
   final DateTime createdAt;
@@ -2233,6 +2311,7 @@ class StockMovementsTableData extends DataClass
     this.sellingPricePerUnit,
     this.totalRevenue,
     this.profit,
+    this.paymentMethod,
     this.reason,
     required this.createdByUserId,
     required this.createdAt,
@@ -2264,6 +2343,9 @@ class StockMovementsTableData extends DataClass
     }
     if (!nullToAbsent || profit != null) {
       map['profit'] = Variable<double>(profit);
+    }
+    if (!nullToAbsent || paymentMethod != null) {
+      map['payment_method'] = Variable<String>(paymentMethod);
     }
     if (!nullToAbsent || reason != null) {
       map['reason'] = Variable<String>(reason);
@@ -2300,6 +2382,9 @@ class StockMovementsTableData extends DataClass
       profit: profit == null && nullToAbsent
           ? const Value.absent()
           : Value(profit),
+      paymentMethod: paymentMethod == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentMethod),
       reason: reason == null && nullToAbsent
           ? const Value.absent()
           : Value(reason),
@@ -2327,6 +2412,7 @@ class StockMovementsTableData extends DataClass
       ),
       totalRevenue: serializer.fromJson<double?>(json['totalRevenue']),
       profit: serializer.fromJson<double?>(json['profit']),
+      paymentMethod: serializer.fromJson<String?>(json['paymentMethod']),
       reason: serializer.fromJson<String?>(json['reason']),
       createdByUserId: serializer.fromJson<String>(json['createdByUserId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2347,6 +2433,7 @@ class StockMovementsTableData extends DataClass
       'sellingPricePerUnit': serializer.toJson<double?>(sellingPricePerUnit),
       'totalRevenue': serializer.toJson<double?>(totalRevenue),
       'profit': serializer.toJson<double?>(profit),
+      'paymentMethod': serializer.toJson<String?>(paymentMethod),
       'reason': serializer.toJson<String?>(reason),
       'createdByUserId': serializer.toJson<String>(createdByUserId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2365,6 +2452,7 @@ class StockMovementsTableData extends DataClass
     Value<double?> sellingPricePerUnit = const Value.absent(),
     Value<double?> totalRevenue = const Value.absent(),
     Value<double?> profit = const Value.absent(),
+    Value<String?> paymentMethod = const Value.absent(),
     Value<String?> reason = const Value.absent(),
     String? createdByUserId,
     DateTime? createdAt,
@@ -2384,6 +2472,9 @@ class StockMovementsTableData extends DataClass
         : this.sellingPricePerUnit,
     totalRevenue: totalRevenue.present ? totalRevenue.value : this.totalRevenue,
     profit: profit.present ? profit.value : this.profit,
+    paymentMethod: paymentMethod.present
+        ? paymentMethod.value
+        : this.paymentMethod,
     reason: reason.present ? reason.value : this.reason,
     createdByUserId: createdByUserId ?? this.createdByUserId,
     createdAt: createdAt ?? this.createdAt,
@@ -2411,6 +2502,9 @@ class StockMovementsTableData extends DataClass
           ? data.totalRevenue.value
           : this.totalRevenue,
       profit: data.profit.present ? data.profit.value : this.profit,
+      paymentMethod: data.paymentMethod.present
+          ? data.paymentMethod.value
+          : this.paymentMethod,
       reason: data.reason.present ? data.reason.value : this.reason,
       createdByUserId: data.createdByUserId.present
           ? data.createdByUserId.value
@@ -2433,6 +2527,7 @@ class StockMovementsTableData extends DataClass
           ..write('sellingPricePerUnit: $sellingPricePerUnit, ')
           ..write('totalRevenue: $totalRevenue, ')
           ..write('profit: $profit, ')
+          ..write('paymentMethod: $paymentMethod, ')
           ..write('reason: $reason, ')
           ..write('createdByUserId: $createdByUserId, ')
           ..write('createdAt: $createdAt')
@@ -2453,6 +2548,7 @@ class StockMovementsTableData extends DataClass
     sellingPricePerUnit,
     totalRevenue,
     profit,
+    paymentMethod,
     reason,
     createdByUserId,
     createdAt,
@@ -2472,6 +2568,7 @@ class StockMovementsTableData extends DataClass
           other.sellingPricePerUnit == this.sellingPricePerUnit &&
           other.totalRevenue == this.totalRevenue &&
           other.profit == this.profit &&
+          other.paymentMethod == this.paymentMethod &&
           other.reason == this.reason &&
           other.createdByUserId == this.createdByUserId &&
           other.createdAt == this.createdAt);
@@ -2490,6 +2587,7 @@ class StockMovementsTableCompanion
   final Value<double?> sellingPricePerUnit;
   final Value<double?> totalRevenue;
   final Value<double?> profit;
+  final Value<String?> paymentMethod;
   final Value<String?> reason;
   final Value<String> createdByUserId;
   final Value<DateTime> createdAt;
@@ -2506,6 +2604,7 @@ class StockMovementsTableCompanion
     this.sellingPricePerUnit = const Value.absent(),
     this.totalRevenue = const Value.absent(),
     this.profit = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
     this.reason = const Value.absent(),
     this.createdByUserId = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2523,6 +2622,7 @@ class StockMovementsTableCompanion
     this.sellingPricePerUnit = const Value.absent(),
     this.totalRevenue = const Value.absent(),
     this.profit = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
     this.reason = const Value.absent(),
     required String createdByUserId,
     required DateTime createdAt,
@@ -2545,6 +2645,7 @@ class StockMovementsTableCompanion
     Expression<double>? sellingPricePerUnit,
     Expression<double>? totalRevenue,
     Expression<double>? profit,
+    Expression<String>? paymentMethod,
     Expression<String>? reason,
     Expression<String>? createdByUserId,
     Expression<DateTime>? createdAt,
@@ -2563,6 +2664,7 @@ class StockMovementsTableCompanion
         'selling_price_per_unit': sellingPricePerUnit,
       if (totalRevenue != null) 'total_revenue': totalRevenue,
       if (profit != null) 'profit': profit,
+      if (paymentMethod != null) 'payment_method': paymentMethod,
       if (reason != null) 'reason': reason,
       if (createdByUserId != null) 'created_by_user_id': createdByUserId,
       if (createdAt != null) 'created_at': createdAt,
@@ -2582,6 +2684,7 @@ class StockMovementsTableCompanion
     Value<double?>? sellingPricePerUnit,
     Value<double?>? totalRevenue,
     Value<double?>? profit,
+    Value<String?>? paymentMethod,
     Value<String?>? reason,
     Value<String>? createdByUserId,
     Value<DateTime>? createdAt,
@@ -2599,6 +2702,7 @@ class StockMovementsTableCompanion
       sellingPricePerUnit: sellingPricePerUnit ?? this.sellingPricePerUnit,
       totalRevenue: totalRevenue ?? this.totalRevenue,
       profit: profit ?? this.profit,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       reason: reason ?? this.reason,
       createdByUserId: createdByUserId ?? this.createdByUserId,
       createdAt: createdAt ?? this.createdAt,
@@ -2644,6 +2748,9 @@ class StockMovementsTableCompanion
     if (profit.present) {
       map['profit'] = Variable<double>(profit.value);
     }
+    if (paymentMethod.present) {
+      map['payment_method'] = Variable<String>(paymentMethod.value);
+    }
     if (reason.present) {
       map['reason'] = Variable<String>(reason.value);
     }
@@ -2673,6 +2780,7 @@ class StockMovementsTableCompanion
           ..write('sellingPricePerUnit: $sellingPricePerUnit, ')
           ..write('totalRevenue: $totalRevenue, ')
           ..write('profit: $profit, ')
+          ..write('paymentMethod: $paymentMethod, ')
           ..write('reason: $reason, ')
           ..write('createdByUserId: $createdByUserId, ')
           ..write('createdAt: $createdAt, ')
@@ -4443,9 +4551,10 @@ typedef $$ProductsTableTableCreateCompanionBuilder =
       required String name,
       required String category,
       Value<String?> subcategory,
+      Value<String?> imageUrl,
       required bool isProduced,
       required double currentSellingPrice,
-      required double currentCostPrice,
+      Value<double?> currentCostPrice,
       Value<int> currentStockQty,
       Value<int?> unitsPerPack,
       Value<String> status,
@@ -4459,9 +4568,10 @@ typedef $$ProductsTableTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> category,
       Value<String?> subcategory,
+      Value<String?> imageUrl,
       Value<bool> isProduced,
       Value<double> currentSellingPrice,
-      Value<double> currentCostPrice,
+      Value<double?> currentCostPrice,
       Value<int> currentStockQty,
       Value<int?> unitsPerPack,
       Value<String> status,
@@ -4496,6 +4606,11 @@ class $$ProductsTableTableFilterComposer
 
   ColumnFilters<String> get subcategory => $composableBuilder(
     column: $table.subcategory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4569,6 +4684,11 @@ class $$ProductsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isProduced => $composableBuilder(
     column: $table.isProduced,
     builder: (column) => ColumnOrderings(column),
@@ -4632,6 +4752,9 @@ class $$ProductsTableTableAnnotationComposer
     column: $table.subcategory,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
   GeneratedColumn<bool> get isProduced => $composableBuilder(
     column: $table.isProduced,
@@ -4707,9 +4830,10 @@ class $$ProductsTableTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> category = const Value.absent(),
                 Value<String?> subcategory = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 Value<bool> isProduced = const Value.absent(),
                 Value<double> currentSellingPrice = const Value.absent(),
-                Value<double> currentCostPrice = const Value.absent(),
+                Value<double?> currentCostPrice = const Value.absent(),
                 Value<int> currentStockQty = const Value.absent(),
                 Value<int?> unitsPerPack = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -4721,6 +4845,7 @@ class $$ProductsTableTableTableManager
                 name: name,
                 category: category,
                 subcategory: subcategory,
+                imageUrl: imageUrl,
                 isProduced: isProduced,
                 currentSellingPrice: currentSellingPrice,
                 currentCostPrice: currentCostPrice,
@@ -4737,9 +4862,10 @@ class $$ProductsTableTableTableManager
                 required String name,
                 required String category,
                 Value<String?> subcategory = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 required bool isProduced,
                 required double currentSellingPrice,
-                required double currentCostPrice,
+                Value<double?> currentCostPrice = const Value.absent(),
                 Value<int> currentStockQty = const Value.absent(),
                 Value<int?> unitsPerPack = const Value.absent(),
                 Value<String> status = const Value.absent(),
@@ -4751,6 +4877,7 @@ class $$ProductsTableTableTableManager
                 name: name,
                 category: category,
                 subcategory: subcategory,
+                imageUrl: imageUrl,
                 isProduced: isProduced,
                 currentSellingPrice: currentSellingPrice,
                 currentCostPrice: currentCostPrice,
@@ -5104,6 +5231,7 @@ typedef $$StockMovementsTableTableCreateCompanionBuilder =
       Value<double?> sellingPricePerUnit,
       Value<double?> totalRevenue,
       Value<double?> profit,
+      Value<String?> paymentMethod,
       Value<String?> reason,
       required String createdByUserId,
       required DateTime createdAt,
@@ -5122,6 +5250,7 @@ typedef $$StockMovementsTableTableUpdateCompanionBuilder =
       Value<double?> sellingPricePerUnit,
       Value<double?> totalRevenue,
       Value<double?> profit,
+      Value<String?> paymentMethod,
       Value<String?> reason,
       Value<String> createdByUserId,
       Value<DateTime> createdAt,
@@ -5189,6 +5318,11 @@ class $$StockMovementsTableTableFilterComposer
 
   ColumnFilters<double> get profit => $composableBuilder(
     column: $table.profit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5272,6 +5406,11 @@ class $$StockMovementsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get reason => $composableBuilder(
     column: $table.reason,
     builder: (column) => ColumnOrderings(column),
@@ -5340,6 +5479,11 @@ class $$StockMovementsTableTableAnnotationComposer
   GeneratedColumn<double> get profit =>
       $composableBuilder(column: $table.profit, builder: (column) => column);
 
+  GeneratedColumn<String> get paymentMethod => $composableBuilder(
+    column: $table.paymentMethod,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get reason =>
       $composableBuilder(column: $table.reason, builder: (column) => column);
 
@@ -5406,6 +5550,7 @@ class $$StockMovementsTableTableTableManager
                 Value<double?> sellingPricePerUnit = const Value.absent(),
                 Value<double?> totalRevenue = const Value.absent(),
                 Value<double?> profit = const Value.absent(),
+                Value<String?> paymentMethod = const Value.absent(),
                 Value<String?> reason = const Value.absent(),
                 Value<String> createdByUserId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -5422,6 +5567,7 @@ class $$StockMovementsTableTableTableManager
                 sellingPricePerUnit: sellingPricePerUnit,
                 totalRevenue: totalRevenue,
                 profit: profit,
+                paymentMethod: paymentMethod,
                 reason: reason,
                 createdByUserId: createdByUserId,
                 createdAt: createdAt,
@@ -5440,6 +5586,7 @@ class $$StockMovementsTableTableTableManager
                 Value<double?> sellingPricePerUnit = const Value.absent(),
                 Value<double?> totalRevenue = const Value.absent(),
                 Value<double?> profit = const Value.absent(),
+                Value<String?> paymentMethod = const Value.absent(),
                 Value<String?> reason = const Value.absent(),
                 required String createdByUserId,
                 required DateTime createdAt,
@@ -5456,6 +5603,7 @@ class $$StockMovementsTableTableTableManager
                 sellingPricePerUnit: sellingPricePerUnit,
                 totalRevenue: totalRevenue,
                 profit: profit,
+                paymentMethod: paymentMethod,
                 reason: reason,
                 createdByUserId: createdByUserId,
                 createdAt: createdAt,

@@ -4,7 +4,9 @@ import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
-import 'package:jusel_app/features/account/view/account_screen.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
+import 'package:jusel_app/features/products/view/products_screen.dart';
+import 'package:jusel_app/features/sales/view/sales_screen.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
 final apprenticeLowStockProvider =
@@ -29,18 +31,34 @@ class _LowStockItem {
   const _LowStockItem({required this.product, required this.stock});
 }
 
-class ApprenticeDashboard extends ConsumerWidget {
-
+class ApprenticeDashboard extends ConsumerStatefulWidget {
   const ApprenticeDashboard({super.key});
 
+  @override
+  ConsumerState<ApprenticeDashboard> createState() => _ApprenticeDashboardState();
+}
 
+class _ApprenticeDashboardState extends ConsumerState<ApprenticeDashboard> {
+  late final List<Widget> _pages;
 
   @override
+  void initState() {
+    super.initState();
+    _pages = <Widget>[
+      _DashboardHome(onNavigateToTab: _setTab),
+      const ProductsScreen(),
+      const SalesScreen(),
+    ];
+  }
 
-  Widget build(BuildContext context, WidgetRef ref) {
+  void _setTab(int index) {
+    ref.read(dashboardTabProvider.notifier).setTab(index);
+  }
 
-    final lowStockAsync = ref.watch(apprenticeLowStockProvider);
-
+  @override
+  Widget build(BuildContext context) {
+    final currentIndex = ref.watch(dashboardTabProvider);
+    
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -49,175 +67,46 @@ class ApprenticeDashboard extends ConsumerWidget {
         }
       },
       child: Scaffold(
-
-      backgroundColor: JuselColors.background,
-
-      bottomNavigationBar: _BottomNav(),
-
-      body: SafeArea(
-
-        child: SingleChildScrollView(
-
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
-          child: Column(
-
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-
-              Row(
-
-                children: [
-
-                  Container(
-
-                    width: 40,
-
-                    height: 40,
-
-                    decoration: BoxDecoration(
-
-                      borderRadius: BorderRadius.circular(12),
-
-                      gradient: const LinearGradient(
-
-                        colors: [Color(0xFF1F6BFF), Color(0xFF6A63FF)],
-
-                        begin: Alignment.topLeft,
-
-                        end: Alignment.bottomRight,
-
-                      ),
-
-                    ),
-
-                    child: const Icon(
-
-                      Icons.store_mall_directory_rounded,
-
-                      color: Colors.white,
-
-                    ),
-
-                  ),
-
-                  const SizedBox(width: JuselSpacing.s12),
-
-                  Text(
-
-                    'Jusel',
-
-                    style: JuselTextStyles.bodyMedium.copyWith(
-
-                      fontWeight: FontWeight.w900,
-
-                      color: JuselColors.foreground,
-
-                      fontSize: 20,
-
-                    ),
-
-                  ),
-
-                  const Spacer(),
-
-                  InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AccountScreen(),
-                        ),
-                      );
-                    },
-                    child: const CircleAvatar(
-                      radius: 22,
-                      backgroundImage: AssetImage(
-                        'assets/avatar_placeholder.png',
-                      ),
-                    ),
-                  ),
-
-                ],
-
-              ),
-
-              const SizedBox(height: JuselSpacing.s12),
-
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
-
-              const SizedBox(height: JuselSpacing.s16),
-
-              Text(
-
-                'Welcome, Apprentice',
-
-                style: JuselTextStyles.headlineLarge.copyWith(
-
-                  fontWeight: FontWeight.w700,
-
-                ),
-
-              ),
-
-              const SizedBox(height: JuselSpacing.s6),
-
-              Text(
-
-                'Ready to make some sales?',
-
-                style: JuselTextStyles.bodySmall.copyWith(
-
-                  color: JuselColors.mutedForeground,
-
-                  fontWeight: FontWeight.w600,
-
-                  fontSize: 14,
-
-                ),
-
-              ),
-
-              const SizedBox(height: JuselSpacing.s20),
-
-              _AlertCard(lowStockAsync: lowStockAsync),
-
-              const SizedBox(height: JuselSpacing.s20),
-
-              _NewSaleCard(),
-
-              const SizedBox(height: JuselSpacing.s12),
-
-              _SavedSaleCard(),
-
-              const SizedBox(height: JuselSpacing.s12),
-
-              _MetricsRow(),
-
-              const SizedBox(height: JuselSpacing.s16),
-
-              _StockOverview(),
-
-              const SizedBox(height: JuselSpacing.s16),
-
-            ],
-
-          ),
-
+        backgroundColor: JuselColors.background(context),
+        body: SafeArea(
+          child: IndexedStack(index: currentIndex, children: _pages),
         ),
-
+        bottomNavigationBar: _BottomNav(
+          currentIndex: currentIndex,
+          onTap: _setTab,
+        ),
       ),
-
-    ),
     );
 
   }
 
 }
 
+class _DashboardHome extends ConsumerWidget {
+  final void Function(int) onNavigateToTab;
 
+  const _DashboardHome({required this.onNavigateToTab});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lowStockAsync = ref.watch(apprenticeLowStockProvider);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: JuselSpacing.s16),
+          _NewSaleCard(onNavigateToTab),
+          const SizedBox(height: JuselSpacing.s16),
+          _SavedSaleCard(onNavigateToTab),
+          const SizedBox(height: JuselSpacing.s16),
+          _AlertCard(lowStockAsync: lowStockAsync),
+        ],
+      ),
+    );
+  }
+}
 
 class _AlertCard extends StatelessWidget {
   final AsyncValue<List<_LowStockItem>> lowStockAsync;
@@ -228,7 +117,7 @@ class _AlertCard extends StatelessWidget {
 
   Widget build(BuildContext context) {
 
-    const alertColor = Color(0xFFB45309);
+    final alertColor = JuselColors.warningColor(context);
 
     return lowStockAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -236,14 +125,14 @@ class _AlertCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(JuselSpacing.s12),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF6E9),
+          color: JuselColors.warningColor(context).withOpacity(0.12),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFF2D8A2)),
+          border: Border.all(color: JuselColors.warningColor(context).withOpacity(0.3)),
         ),
         child: Text(
           'Failed to load alerts: $e',
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.destructive,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.destructiveColor(context),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -254,15 +143,15 @@ class _AlertCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(JuselSpacing.s12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: JuselColors.card(context),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: JuselColors.border),
+              border: Border.all(color: JuselColors.border(context)),
             ),
             child: Text(
               'No low stock alerts.',
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w700,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           );
@@ -293,13 +182,13 @@ class _AlertCard extends StatelessWidget {
                           vertical: JuselSpacing.s16,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF6E9),
+                          color: JuselColors.warningColor(context).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFF2D8A2)),
+                          border: Border.all(color: JuselColors.warningColor(context).withOpacity(0.3)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning_amber_rounded,
+                            Icon(Icons.warning_amber_rounded,
                                 color: alertColor),
                             const SizedBox(width: JuselSpacing.s12),
                             Expanded(
@@ -309,7 +198,7 @@ class _AlertCard extends StatelessWidget {
                                   Text(
                                     'Low stock: ${item.product.name}',
                                     style:
-                                        JuselTextStyles.bodyMedium.copyWith(
+                                        JuselTextStyles.bodyMedium(context).copyWith(
                                       color: alertColor,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -317,8 +206,8 @@ class _AlertCard extends StatelessWidget {
                                   const SizedBox(height: 4),
                                   Text(
                                     'Only ${item.stock} units remaining.',
-                                    style: JuselTextStyles.bodySmall.copyWith(
-                                      color: const Color(0xFF92400E),
+                                    style: JuselTextStyles.bodySmall(context).copyWith(
+                                      color: alertColor,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13,
                                     ),
@@ -326,7 +215,7 @@ class _AlertCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: alertColor),
+                            Icon(Icons.chevron_right, color: alertColor),
                           ],
                         ),
                       ),
@@ -346,6 +235,9 @@ class _AlertCard extends StatelessWidget {
 
 
 class _NewSaleCard extends StatelessWidget {
+  final void Function(int) onNavigateToTab;
+
+  const _NewSaleCard(this.onNavigateToTab);
 
   @override
 
@@ -365,11 +257,11 @@ class _NewSaleCard extends StatelessWidget {
 
             height: 170,
 
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
 
               gradient: LinearGradient(
 
-                colors: [Color(0xFF2478FF), Color(0xFF5594FF)],
+                colors: [JuselColors.primaryColor(context), JuselColors.primaryColor(context).withOpacity(0.8)],
 
                 begin: Alignment.topLeft,
 
@@ -407,7 +299,7 @@ class _NewSaleCard extends StatelessWidget {
 
               size: 150,
 
-              color: Colors.white.withOpacity(0.08),
+              color: JuselColors.primaryForeground.withOpacity(0.08),
 
             ),
 
@@ -429,9 +321,9 @@ class _NewSaleCard extends StatelessWidget {
 
                     'New Sale',
 
-                    style: JuselTextStyles.headlineSmall.copyWith(
+                    style: JuselTextStyles.headlineSmall(context).copyWith(
 
-                      color: Colors.white,
+                      color: JuselColors.primaryForeground,
 
                       fontWeight: FontWeight.w800,
 
@@ -447,9 +339,9 @@ class _NewSaleCard extends StatelessWidget {
 
                     'Process a new customer order',
 
-                    style: JuselTextStyles.bodySmall.copyWith(
+                    style: JuselTextStyles.bodySmall(context).copyWith(
 
-                      color: Colors.white.withOpacity(0.9),
+                      color: JuselColors.primaryForeground.withOpacity(0.9),
 
                       fontWeight: FontWeight.w600,
 
@@ -469,19 +361,21 @@ class _NewSaleCard extends StatelessWidget {
 
                       borderRadius: BorderRadius.circular(999),
 
-                      onTap: () {},
+                      onTap: () {
+                        onNavigateToTab(2); // Navigate to Sales tab
+                      },
 
                       child: Container(
 
                         decoration: BoxDecoration(
 
-                          color: Colors.white.withOpacity(0.22),
+                          color: JuselColors.primaryForeground.withOpacity(0.22),
 
                           borderRadius: BorderRadius.circular(999),
 
                           border: Border.all(
 
-                            color: Colors.white.withOpacity(0.35),
+                            color: JuselColors.primaryForeground.withOpacity(0.35),
 
                             width: 1,
 
@@ -527,7 +421,7 @@ class _NewSaleCard extends StatelessWidget {
 
                                 fontSize: 14,
 
-                                color: Colors.white,
+                                color: JuselColors.primaryForeground,
 
                               ),
 
@@ -541,7 +435,7 @@ class _NewSaleCard extends StatelessWidget {
 
                               size: 18,
 
-                              color: Colors.white,
+                              color: JuselColors.primaryForeground,
 
                             ),
 
@@ -576,6 +470,9 @@ class _NewSaleCard extends StatelessWidget {
 
 
 class _SavedSaleCard extends StatelessWidget {
+  final void Function(int) onNavigateToTab;
+
+  const _SavedSaleCard(this.onNavigateToTab);
 
   @override
 
@@ -589,11 +486,11 @@ class _SavedSaleCard extends StatelessWidget {
 
       decoration: BoxDecoration(
 
-        color: Colors.white,
+        color: JuselColors.card(context),
 
         borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: JuselColors.border(context)),
 
         boxShadow: [
 
@@ -625,17 +522,17 @@ class _SavedSaleCard extends StatelessWidget {
 
             decoration: BoxDecoration(
 
-              color: JuselColors.muted,
+              color: JuselColors.muted(context),
 
               borderRadius: BorderRadius.circular(10),
 
             ),
 
-            child: const Icon(
+            child: Icon(
 
               Icons.receipt_long_outlined,
 
-              color: JuselColors.primary,
+              color: JuselColors.primaryColor(context),
 
             ),
 
@@ -661,11 +558,11 @@ class _SavedSaleCard extends StatelessWidget {
 
                         'Saved Sale',
 
-                        style: JuselTextStyles.bodyMedium.copyWith(
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
 
                           fontWeight: FontWeight.w700,
 
-                          color: JuselColors.foreground,
+                          color: JuselColors.foreground(context),
 
                           fontSize: 18,
 
@@ -677,7 +574,9 @@ class _SavedSaleCard extends StatelessWidget {
 
                     TextButton(
 
-                      onPressed: () {},
+                      onPressed: () {
+                        onNavigateToTab(2); // Navigate to Sales tab
+                      },
 
                       style: TextButton.styleFrom(
 
@@ -687,7 +586,7 @@ class _SavedSaleCard extends StatelessWidget {
 
                       ),
 
-                      child: const Row(
+                      child: Row(
 
                         mainAxisSize: MainAxisSize.min,
 
@@ -699,7 +598,7 @@ class _SavedSaleCard extends StatelessWidget {
 
                             style: TextStyle(
 
-                              color: JuselColors.primary,
+                              color: JuselColors.primaryColor(context),
 
                               fontWeight: FontWeight.w800,
 
@@ -717,7 +616,7 @@ class _SavedSaleCard extends StatelessWidget {
 
                             size: 18,
 
-                            color: JuselColors.primary,
+                            color: JuselColors.primaryColor(context),
 
                           ),
 
@@ -737,9 +636,9 @@ class _SavedSaleCard extends StatelessWidget {
 
                   '3 items - 15 mins ago',
 
-                  style: JuselTextStyles.bodySmall.copyWith(
+                  style: JuselTextStyles.bodySmall(context).copyWith(
 
-                    color: JuselColors.mutedForeground,
+                    color: JuselColors.mutedForeground(context),
 
                     fontWeight: FontWeight.w600,
 
@@ -767,39 +666,6 @@ class _SavedSaleCard extends StatelessWidget {
 
 
 
-class _MetricsRow extends StatelessWidget {
-
-  @override
-
-  Widget build(BuildContext context) {
-
-    return const Row(
-
-      children: [
-
-        Expanded(
-
-          child: _MetricCard(label: "Today's Sales", value: 'GHS 24,500'),
-
-        ),
-
-        SizedBox(width: JuselSpacing.s12),
-
-        Expanded(
-
-          child: _MetricCard(label: 'Items Sold', value: '18'),
-
-        ),
-
-      ],
-
-    );
-
-  }
-
-}
-
-
 
 class _MetricCard extends StatelessWidget {
 
@@ -823,11 +689,11 @@ class _MetricCard extends StatelessWidget {
 
       decoration: BoxDecoration(
 
-        color: Colors.white,
+        color: JuselColors.card(context),
 
         borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: JuselColors.border(context)),
 
         boxShadow: [
 
@@ -855,9 +721,9 @@ class _MetricCard extends StatelessWidget {
 
             label,
 
-            style: JuselTextStyles.bodySmall.copyWith(
+            style: JuselTextStyles.bodySmall(context).copyWith(
 
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
 
               fontWeight: FontWeight.w700,
 
@@ -873,11 +739,11 @@ class _MetricCard extends StatelessWidget {
 
             value,
 
-            style: JuselTextStyles.headlineLarge.copyWith(
+            style: JuselTextStyles.headlineLarge(context).copyWith(
 
               fontWeight: FontWeight.w900,
 
-              color: JuselColors.foreground,
+              color: JuselColors.foreground(context),
 
               fontSize: 24,
 
@@ -899,109 +765,6 @@ class _MetricCard extends StatelessWidget {
 
 
 
-class _StockOverview extends StatelessWidget {
-
-  final List<_StockItem> items = const [
-
-    _StockItem(
-
-      name: 'Orange Juice 1L',
-
-      category: 'Drinks',
-
-      status: _StockStatus.good,
-
-    ),
-
-    _StockItem(
-
-      name: 'Whole Wheat Bread',
-
-      category: 'Bakery',
-
-      status: _StockStatus.low,
-
-    ),
-
-    _StockItem(
-
-      name: 'Chocolate Bar',
-
-      category: 'Snacks',
-
-      status: _StockStatus.good,
-
-    ),
-
-    _StockItem(
-
-      name: 'Dairy Milk 500ml',
-
-      category: 'Dairy',
-
-      status: _StockStatus.out,
-
-    ),
-
-    _StockItem(
-
-      name: 'Bottled Water 50cl',
-
-      category: 'Drinks',
-
-      status: _StockStatus.good,
-
-    ),
-
-  ];
-
-
-
-  @override
-
-  Widget build(BuildContext context) {
-
-    return Column(
-
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-
-        Text(
-
-          'Stock Overview',
-
-          style: JuselTextStyles.headlineSmall.copyWith(
-
-            fontWeight: FontWeight.w700,
-
-          ),
-
-        ),
-
-        const SizedBox(height: JuselSpacing.s16),
-
-        ...items.map(
-
-          (item) => Padding(
-
-            padding: const EdgeInsets.only(bottom: JuselSpacing.s12),
-
-            child: _StockCard(item: item),
-
-          ),
-
-        ),
-
-      ],
-
-    );
-
-  }
-
-}
-
-
 
 class _StockCard extends StatelessWidget {
 
@@ -1013,21 +776,21 @@ class _StockCard extends StatelessWidget {
 
 
 
-  Color _statusColor() {
+  Color _statusColor(BuildContext context) {
 
     switch (item.status) {
 
       case _StockStatus.good:
 
-        return const Color(0xFF22C55E);
+        return JuselColors.successColor(context);
 
       case _StockStatus.low:
 
-        return const Color(0xFFF59E0B);
+        return JuselColors.warningColor(context);
 
       case _StockStatus.out:
 
-        return const Color(0xFFEF4444);
+        return JuselColors.destructiveColor(context);
 
     }
 
@@ -1035,21 +798,21 @@ class _StockCard extends StatelessWidget {
 
 
 
-  Color _statusBg() {
+  Color _statusBg(BuildContext context) {
 
     switch (item.status) {
 
       case _StockStatus.good:
 
-        return const Color(0xFFE9FAF0);
+        return JuselColors.successColor(context).withOpacity(0.12);
 
       case _StockStatus.low:
 
-        return const Color(0xFFFFF3E0);
+        return JuselColors.warningColor(context).withOpacity(0.12);
 
       case _StockStatus.out:
 
-        return const Color(0xFFFDECEC);
+        return JuselColors.destructiveColor(context).withOpacity(0.12);
 
     }
 
@@ -1083,7 +846,7 @@ class _StockCard extends StatelessWidget {
 
   Widget build(BuildContext context) {
 
-    final statusColor = _statusColor();
+    final statusColor = _statusColor(context);
 
     return Container(
 
@@ -1093,11 +856,11 @@ class _StockCard extends StatelessWidget {
 
       decoration: BoxDecoration(
 
-        color: Colors.white,
+        color: JuselColors.card(context),
 
         borderRadius: BorderRadius.circular(14),
 
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: JuselColors.border(context)),
 
         boxShadow: [
 
@@ -1133,11 +896,11 @@ class _StockCard extends StatelessWidget {
 
                   item.name,
 
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
 
                     fontWeight: FontWeight.w600,
 
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
 
                     fontSize: 16,
 
@@ -1151,9 +914,9 @@ class _StockCard extends StatelessWidget {
 
                   item.category,
 
-                  style: JuselTextStyles.bodySmall.copyWith(
+                  style: JuselTextStyles.bodySmall(context).copyWith(
 
-                    color: JuselColors.mutedForeground,
+                    color: JuselColors.mutedForeground(context),
 
                     fontWeight: FontWeight.w600,
 
@@ -1175,7 +938,7 @@ class _StockCard extends StatelessWidget {
 
             decoration: BoxDecoration(
 
-              color: _statusBg(),
+              color: _statusBg(context),
 
               borderRadius: BorderRadius.circular(12),
 
@@ -1240,6 +1003,10 @@ class _StockItem {
 
 
 class _BottomNav extends StatelessWidget {
+  final int currentIndex;
+  final void Function(int) onTap;
+
+  const _BottomNav({required this.currentIndex, required this.onTap});
 
   @override
 
@@ -1247,9 +1014,9 @@ class _BottomNav extends StatelessWidget {
 
     return BottomNavigationBar(
 
-      currentIndex: 0,
+      currentIndex: currentIndex,
 
-      onTap: (_) {},
+      onTap: onTap,
 
       items: const [
 

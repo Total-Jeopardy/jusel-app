@@ -59,9 +59,10 @@ class InventoryService {
 
     for (var product in products) {
       final stock = await getCurrentStock(product.id);
-      // currentCostPrice is not nullable, but can be 0.0 if not set
-      if (product.currentCostPrice > 0) {
-        total += stock * product.currentCostPrice;
+      // currentCostPrice is nullable, so we need to null-check and ensure > 0
+      final costPrice = product.currentCostPrice ?? 0.0;
+      if (costPrice > 0) {
+        total += stock * costPrice;
       }
     }
 

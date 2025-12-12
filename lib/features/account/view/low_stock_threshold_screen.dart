@@ -54,8 +54,8 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                 Text(
                   'Set the minimum quantity at which a product is considered low stock. This helps you restock in time.',
                   textAlign: TextAlign.center,
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -67,16 +67,16 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                     vertical: JuselSpacing.s16,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: JuselColors.card(context),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: JuselColors.border),
+                    border: Border.all(color: JuselColors.border(context)),
                   ),
                   child: Column(
                     children: [
                       Text(
                         'THRESHOLD (UNITS)',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.2,
                         ),
@@ -88,8 +88,8 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                           _CircleButton(icon: Icons.remove, onTap: _decrement),
                           Text(
                             '$_threshold',
-                            style: JuselTextStyles.headlineLarge.copyWith(
-                              color: JuselColors.primary,
+                            style: JuselTextStyles.headlineLarge(context).copyWith(
+                              color: JuselColors.primaryColor(context),
                               fontSize: 40,
                               fontWeight: FontWeight.w800,
                             ),
@@ -100,8 +100,8 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                       const SizedBox(height: JuselSpacing.s12),
                       Text(
                         'Recommended: 5–20 units',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -113,31 +113,33 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(JuselSpacing.s12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0F7FF),
+                    color: JuselColors.primaryColor(context).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDBEAFE)),
+                    border: Border.all(
+                      color: JuselColors.primaryColor(context).withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.info_outline,
-                        color: JuselColors.primary,
+                        color: JuselColors.primaryColor(context),
                       ),
                       const SizedBox(width: JuselSpacing.s12),
                       Expanded(
                         child: Text.rich(
                           TextSpan(
                             text: 'Products with stock below ',
-                            style: JuselTextStyles.bodyMedium.copyWith(
-                              color: JuselColors.foreground,
+                            style: JuselTextStyles.bodyMedium(context).copyWith(
+                              color: JuselColors.foreground(context),
                               fontWeight: FontWeight.w600,
                             ),
                             children: [
                               TextSpan(
                                 text: '$_threshold units ',
-                                style: const TextStyle(
-                                  color: JuselColors.primary,
+                                style: TextStyle(
+                                  color: JuselColors.primaryColor(context),
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -164,8 +166,8 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor: JuselColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: JuselColors.primaryColor(context),
+                      foregroundColor: JuselColors.primaryForeground,
                     ),
                     child: const Text(
                       'Save Changes',
@@ -199,11 +201,11 @@ class _CircleButton extends StatelessWidget {
       child: Container(
         width: 48,
         height: 48,
-        decoration: const BoxDecoration(
-          color: JuselColors.muted,
+        decoration: BoxDecoration(
+          color: JuselColors.muted(context),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: JuselColors.foreground, size: 24),
+        child: Icon(icon, color: JuselColors.foreground(context), size: 24),
       ),
     );
   }

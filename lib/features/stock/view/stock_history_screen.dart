@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/utils/theme.dart';
-import 'package:jusel_app/core/utils/navigation_helper.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 
 final stockMovementsProvider = FutureProvider.autoDispose
     .family<List<StockMovementsTableData>, String>((ref, productId) async {
@@ -37,28 +37,42 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
   Widget build(BuildContext context) {
     final movementsAsync = ref.watch(stockMovementsProvider(widget.productId));
 
-    return Scaffold(
-      backgroundColor: JuselColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        shape: const Border(
-          bottom: BorderSide(color: JuselColors.border, width: 1),
-        ),
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: JuselColors.muted,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () =>
-                  safePop(context, fallbackRoute: '/boss-dashboard'),
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (!didPop && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else if (!didPop) {
+          ref.read(dashboardTabProvider.notifier).goToDashboard();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: JuselColors.background(context),
+        appBar: AppBar(
+          elevation: 0,
+          shape: Border(
+            bottom: BorderSide(color: JuselColors.border(context), width: 1),
+          ),
+          leadingWidth: 64,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: JuselColors.muted(context),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    ref.read(dashboardTabProvider.notifier).goToDashboard();
+                  }
+                },
+              ),
             ),
           ),
-        ),
         title: const Text(
           'Stock History',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -80,7 +94,7 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
                   Expanded(
                     child: Text(
                       widget.productName,
-                      style: JuselTextStyles.headlineSmall.copyWith(
+                      style: JuselTextStyles.headlineSmall(context).copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -92,16 +106,16 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
                     children: [
                       Text(
                         widget.currentStock.toString(),
-                        style: JuselTextStyles.headlineMedium.copyWith(
-                          color: JuselColors.primary,
+                        style: JuselTextStyles.headlineMedium(context).copyWith(
+                          color: JuselColors.primaryColor(context),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: JuselSpacing.s2),
                       Text(
                         'Current Stock',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -110,7 +124,7 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
                 ],
               ),
               const SizedBox(height: JuselSpacing.s16),
-              const Divider(height: 1, color: JuselColors.border),
+              Divider(height: 1, color: JuselColors.border(context)),
               const SizedBox(height: JuselSpacing.s12),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -151,16 +165,16 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
                     children: [
                       Text(
                         'Failed to load movements',
-                        style: JuselTextStyles.bodyMedium.copyWith(
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
                           fontWeight: FontWeight.w700,
-                          color: JuselColors.destructive,
+                          color: JuselColors.destructiveColor(context),
                         ),
                       ),
                       const SizedBox(height: JuselSpacing.s8),
                       Text(
                         e.toString(),
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                         ),
                       ),
                       const SizedBox(height: JuselSpacing.s12),
@@ -184,15 +198,15 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(JuselSpacing.s16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: JuselColors.card(context),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: JuselColors.border),
+                        border: Border.all(color: JuselColors.border(context)),
                       ),
                       child: Text(
                         'No stock movements yet.',
-                        style: JuselTextStyles.bodyMedium.copyWith(
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
                           fontWeight: FontWeight.w700,
-                          color: JuselColors.mutedForeground,
+                          color: JuselColors.mutedForeground(context),
                         ),
                       ),
                     );
@@ -224,6 +238,7 @@ class _StockHistoryScreenState extends ConsumerState<StockHistoryScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -241,8 +256,8 @@ class _DaySection extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
           ),
@@ -267,10 +282,10 @@ class _MovementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final meta = _movementMeta(movement);
+    final meta = _movementMeta(context, movement);
     final deltaColor = meta.isAddition
-        ? JuselColors.success
-        : JuselColors.destructive;
+        ? JuselColors.successColor(context)
+        : JuselColors.destructiveColor(context);
     final deltaPrefix = meta.isAddition ? '+' : '-';
     final reasonText = movement.reason != null && movement.reason!.isNotEmpty
         ? ' - ${movement.reason!.replaceAll('_', ' ')}'
@@ -280,9 +295,9 @@ class _MovementCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF7FAFF),
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: JuselColors.border),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       padding: const EdgeInsets.all(JuselSpacing.s16),
       child: Row(
@@ -304,16 +319,16 @@ class _MovementCard extends StatelessWidget {
               children: [
                 Text(
                   meta.title,
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                   ),
                 ),
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
                   subtitle,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -326,14 +341,14 @@ class _MovementCard extends StatelessWidget {
                       vertical: JuselSpacing.s6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: JuselColors.card(context),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: JuselColors.border),
+                      border: Border.all(color: JuselColors.border(context)),
                     ),
                     child: Text(
                       movement.reason!,
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.foreground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.foreground(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -348,7 +363,7 @@ class _MovementCard extends StatelessWidget {
             children: [
               Text(
                 '$deltaPrefix${meta.displayDelta}',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   color: deltaColor,
                   fontWeight: FontWeight.w700,
                 ),
@@ -374,6 +389,10 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedBg = JuselColors.primaryColor(context);
+    final unselectedBg = JuselColors.card(context);
+    final unselectedText = JuselColors.mutedForeground(context);
+
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
@@ -383,16 +402,16 @@ class _FilterChip extends StatelessWidget {
           vertical: JuselSpacing.s8,
         ),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0F172A) : Colors.white,
+          color: selected ? selectedBg : unselectedBg,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? Colors.transparent : JuselColors.border,
+            color: selected ? Colors.transparent : JuselColors.border(context),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : JuselColors.mutedForeground,
+            color: selected ? JuselColors.primaryForeground : unselectedText,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
           ),
         ),
@@ -412,15 +431,15 @@ class _ProductThumbnail extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: JuselColors.muted,
+        color: JuselColors.muted(context),
         image: imageAsset != null
             ? DecorationImage(image: AssetImage(imageAsset!), fit: BoxFit.cover)
             : null,
       ),
       child: imageAsset == null
-          ? const Icon(
+          ? Icon(
               Icons.inventory_2_outlined,
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
             )
           : null,
     );
@@ -486,7 +505,7 @@ String _dayLabel(DateTime date) {
   return DateFormat('MMM d, yyyy').format(date);
 }
 
-_MovementMeta _movementMeta(StockMovementsTableData movement) {
+_MovementMeta _movementMeta(BuildContext context, StockMovementsTableData movement) {
   final filterLabel = _filterLabelForType(movement.type);
   final absQuantity = movement.quantityUnits.abs();
 
@@ -495,62 +514,68 @@ _MovementMeta _movementMeta(StockMovementsTableData movement) {
   Color badgeColor;
   Color badgeIconColor;
   String title;
+  final primary = JuselColors.primaryColor(context);
+  final success = JuselColors.successColor(context);
+  final warning = JuselColors.warningColor(context);
+  final destructive = JuselColors.destructiveColor(context);
+  final muted = JuselColors.mutedForeground(context);
+
 
   switch (movement.type) {
     case 'sale':
       isAddition = false;
       icon = Icons.shopping_cart_outlined;
-      badgeColor = const Color(0xFFFFE4E6);
-      badgeIconColor = JuselColors.destructive;
+      badgeColor = destructive.withOpacity(0.14);
+      badgeIconColor = destructive;
       title = 'Sale';
       break;
     case 'stock_in':
       isAddition = true;
       icon = Icons.inventory_outlined;
-      badgeColor = const Color(0xFFE9FBE7);
-      badgeIconColor = JuselColors.success;
+      badgeColor = success.withOpacity(0.14);
+      badgeIconColor = success;
       title = 'Restock';
       break;
     case 'production_output':
       isAddition = true;
       icon = Icons.inventory_2_outlined;
-      badgeColor = const Color(0xFFE8F1FF);
-      badgeIconColor = JuselColors.primary;
+      badgeColor = primary.withOpacity(0.14);
+      badgeIconColor = primary;
       title = 'Production';
       break;
     case 'stock_out':
       isAddition = false;
       icon = Icons.outbox_outlined;
-      badgeColor = const Color(0xFFFFF1F2);
-      badgeIconColor = JuselColors.destructive;
+      badgeColor = destructive.withOpacity(0.14);
+      badgeIconColor = destructive;
       title = 'Stock Out';
       break;
     case 'adjustment':
       isAddition = movement.quantityUnits >= 0;
       icon = Icons.tune;
-      badgeColor = const Color(0xFFE8F1FF);
-      badgeIconColor = const Color(0xFF6B7280);
+      badgeColor = JuselColors.card(context);
+      badgeIconColor = muted;
       title = 'Adjustment';
       break;
     case 'wastage':
       isAddition = false;
       icon = Icons.delete_outline;
-      badgeColor = const Color(0xFFFFEDE5);
-      badgeIconColor = const Color(0xFFF97316);
+      badgeColor = warning.withOpacity(0.14);
+      badgeIconColor = warning;
       title = 'Wastage';
       break;
     case 'return':
       isAddition = true;
       icon = Icons.reply_outlined;
-      badgeColor = const Color(0xFFE8F1FF);
-      badgeIconColor = JuselColors.primary;
+      badgeColor = primary.withOpacity(0.14);
+      badgeIconColor = primary;
       title = 'Return';
       break;
     default:
       isAddition = movement.quantityUnits >= 0;
       icon = Icons.history;
-      badgeColor = const Color(0xFFE5E7EB);
-      badgeIconColor = JuselColors.mutedForeground;
+      badgeColor = JuselColors.muted(context);
+      badgeIconColor = muted;
       title = filterLabel;
       break;
   }

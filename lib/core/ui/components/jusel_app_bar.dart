@@ -18,11 +18,11 @@ class JuselAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       title: Text(
         title,
-        style: JuselTextStyles.headlineMedium,
+        style: JuselTextStyles.headlineMedium(context),
       ),
       automaticallyImplyLeading: automaticallyImplyLeading,
-      backgroundColor: JuselColors.background,
-      foregroundColor: JuselColors.foreground,
+      backgroundColor: JuselColors.background(context),
+      foregroundColor: JuselColors.foreground(context),
       elevation: 0,
       actions: actions,
     );
@@ -31,8 +31,3 @@ class JuselAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
-
-
-
-
-

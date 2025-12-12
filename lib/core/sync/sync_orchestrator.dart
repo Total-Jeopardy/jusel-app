@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:drift/drift.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/database/daos/pending_sync_queue_dao.dart';
 
@@ -131,6 +132,7 @@ class SyncOrchestrator {
       'totalRevenue': payload['totalRevenue'],
       'totalCost': payload['totalCost'],
       'profit': payload['profit'],
+      'paymentMethod': payload['paymentMethod'] ?? 'cash',
       'createdByUserId': payload['createdByUserId'],
       'createdAt': Timestamp.fromDate(
         DateTime.parse(payload['createdAt'] as String),
@@ -205,8 +207,8 @@ class SyncOrchestrator {
       'subcategory': payload['subcategory'],
       'isProduced': payload['isProduced'],
       'currentSellingPrice': payload['currentSellingPrice'],
-      'currentCostPrice': payload['currentCostPrice'],
       'unitsPerPack': payload['unitsPerPack'],
+      'imageUrl': payload['imageUrl'],
       'status': payload['status'],
       'createdAt': Timestamp.fromDate(
         DateTime.parse(payload['createdAt'] as String),
@@ -277,6 +279,235 @@ class SyncOrchestrator {
       failedCount: failed.length,
       totalPending: queued.length + retrying.length,
     );
+  }
+
+  /// Pull down data from Firestore for the current user and hydrate local DB.
+  /// This complements the push sync so a fresh device has data after login.
+  /// 
+  /// Note: Pulls ALL data (not filtered by userId) to ensure all devices see all shop data.
+  Future<SyncResult> pullAllForUser(String userId) async {
+    if (!await isOnline()) {
+      return SyncResult(
+        status: SyncStatus.offline,
+        syncedCount: 0,
+        failedCount: 0,
+        error: 'Device is offline',
+      );
+    }
+
+    int synced = 0;
+    int failed = 0;
+    String? lastError;
+
+    try {
+      // Products - Pull ALL products (not filtered by userId) so all devices see all shop data
+      final productsSnap = await firestore
+          .collection('products')
+          .get();
+      
+      print('[SyncOrchestrator] Pulling ${productsSnap.docs.length} products from Firestore');
+
+      await db.transaction(() async {
+        for (final doc in productsSnap.docs) {
+          try {
+            final data = doc.data();
+            if (data['name'] == null || data['category'] == null) {
+              failed++;
+              lastError = 'Missing product fields for ${doc.id}';
+              continue;
+            }
+            await db
+                .into(db.productsTable)
+                .insertOnConflictUpdate(
+                  ProductsTableCompanion.insert(
+                    id: doc.id,
+                    name: data['name'] as String,
+                    category: data['category'] as String,
+                    subcategory: Value(data['subcategory'] as String?),
+                    imageUrl: Value(data['imageUrl'] as String?),
+                    isProduced: data['isProduced'] as bool? ?? false,
+                    currentSellingPrice: (data['currentSellingPrice'] as num)
+                        .toDouble(),
+                    unitsPerPack: Value(
+                      (data['unitsPerPack'] as num?)?.toInt(),
+                    ),
+                    status: Value(data['status'] as String? ?? 'active'),
+                    currentCostPrice: Value(
+                      (data['currentCostPrice'] as num?)?.toDouble(),
+                    ),
+                    createdAt:
+                        (data['createdAt'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                    updatedAt: Value(
+                      (data['updatedAt'] as Timestamp?)?.toDate(),
+                    ),
+                  ),
+                );
+            synced++;
+          } catch (e) {
+            failed++;
+            lastError = e.toString();
+          }
+        }
+      });
+
+      // Sales -> stock movements (type: sale) - Pull ALL sales
+      final salesSnap = await firestore
+          .collection('sales')
+          .get();
+      
+      print('[SyncOrchestrator] Pulling ${salesSnap.docs.length} sales from Firestore');
+      await db.transaction(() async {
+        for (final doc in salesSnap.docs) {
+          try {
+            final data = doc.data();
+            if (data['productId'] == null || data['quantity'] == null) {
+              failed++;
+              lastError = 'Missing sale fields for ${doc.id}';
+              continue;
+            }
+            await db
+                .into(db.stockMovementsTable)
+                .insertOnConflictUpdate(
+                  StockMovementsTableCompanion.insert(
+                    id: doc.id,
+                    productId: data['productId'] as String,
+                    type: 'sale',
+                    quantityUnits: (data['quantity'] as num).toInt(),
+                    sellingPricePerUnit: Value(
+                      (data['unitSellingPrice'] as num).toDouble(),
+                    ),
+                    costPerUnit: Value(
+                      (data['unitCostPrice'] as num).toDouble(),
+                    ),
+                    totalRevenue: Value(
+                      (data['totalRevenue'] as num).toDouble(),
+                    ),
+                    totalCost: Value((data['totalCost'] as num).toDouble()),
+                    profit: Value((data['profit'] as num).toDouble()),
+                    paymentMethod: Value(
+                      data['paymentMethod'] as String? ?? 'cash',
+                    ),
+                    createdByUserId: data['createdByUserId'] as String,
+                    createdAt:
+                        (data['createdAt'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                  ),
+                );
+            synced++;
+          } catch (e) {
+            failed++;
+            lastError = e.toString();
+          }
+        }
+      });
+
+      // Restocks -> stock movements (type: stock_in) - Pull ALL restocks
+      final restocksSnap = await firestore
+          .collection('restocks')
+          .get();
+      
+      print('[SyncOrchestrator] Pulling ${restocksSnap.docs.length} restocks from Firestore');
+      await db.transaction(() async {
+        for (final doc in restocksSnap.docs) {
+          try {
+            final data = doc.data();
+            if (data['productId'] == null || data['quantity'] == null) {
+              failed++;
+              lastError = 'Missing restock fields for ${doc.id}';
+              continue;
+            }
+            final qty = (data['quantity'] as num).toInt();
+            final costPerUnit = (data['costPerUnit'] as num).toDouble();
+            await db
+                .into(db.stockMovementsTable)
+                .insertOnConflictUpdate(
+                  StockMovementsTableCompanion.insert(
+                    id: doc.id,
+                    productId: data['productId'] as String,
+                    type: 'stock_in',
+                    quantityUnits: qty,
+                    costPerUnit: Value(costPerUnit),
+                    totalCost: Value((data['totalCost'] as num).toDouble()),
+                    createdByUserId: data['createdByUserId'] as String,
+                    createdAt:
+                        (data['createdAt'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                    reason: const Value('purchase'),
+                  ),
+                );
+            // Also update latest cost on product
+            await (db.update(db.productsTable)
+                  ..where((tbl) => tbl.id.equals(data['productId'] as String)))
+                .write(
+                  ProductsTableCompanion(
+                    currentCostPrice: Value(costPerUnit),
+                    updatedAt: Value(DateTime.now()),
+                  ),
+                );
+            synced++;
+          } catch (e) {
+            failed++;
+            lastError = e.toString();
+          }
+        }
+      });
+
+      // Production batches -> stock movements (type: production_output) - Pull ALL batches
+      final productionSnap = await firestore
+          .collection('production_batches')
+          .get();
+      
+      print('[SyncOrchestrator] Pulling ${productionSnap.docs.length} production batches from Firestore');
+      await db.transaction(() async {
+        for (final doc in productionSnap.docs) {
+          try {
+            final data = doc.data();
+            if (data['productId'] == null || data['quantityProduced'] == null) {
+              failed++;
+              lastError = 'Missing production fields for ${doc.id}';
+              continue;
+            }
+            await db
+                .into(db.stockMovementsTable)
+                .insertOnConflictUpdate(
+                  StockMovementsTableCompanion.insert(
+                    id: doc.id,
+                    productId: data['productId'] as String,
+                    type: 'production_output',
+                    quantityUnits:
+                        (data['quantityProduced'] as num?)?.toInt() ?? 0,
+                    costPerUnit: Value((data['unitCost'] as num?)?.toDouble()),
+                    totalCost: Value((data['totalCost'] as num?)?.toDouble()),
+                    createdByUserId: data['createdByUserId'] as String,
+                    createdAt:
+                        (data['createdAt'] as Timestamp?)?.toDate() ??
+                        DateTime.now(),
+                    batchId: Value(doc.id),
+                  ),
+                );
+            synced++;
+          } catch (e) {
+            failed++;
+            lastError = e.toString();
+          }
+        }
+      });
+    } catch (e) {
+      failed++;
+      lastError = e.toString();
+    }
+
+    final result = SyncResult(
+      status: failed > 0 ? SyncStatus.error : SyncStatus.allSynced,
+      syncedCount: synced,
+      failedCount: failed,
+      error: lastError,
+    );
+    
+    print('[SyncOrchestrator] Pull completed: ${result.syncedCount} synced, ${result.failedCount} failed, status: ${result.status}');
+    
+    return result;
   }
 }
 

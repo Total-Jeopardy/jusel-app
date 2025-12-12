@@ -5,6 +5,7 @@ import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
 
 final productDetailProvider = FutureProvider.autoDispose
@@ -38,19 +39,32 @@ class ProductDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(productDetailProvider(productId));
 
-    return Scaffold(
-      backgroundColor: JuselColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (!didPop && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: JuselColors.background(context),
+        appBar: AppBar(
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                ref.read(dashboardTabProvider.notifier).goToDashboard();
+              }
+            },
+          ),
+          title: const Text(
+            'Product Detail',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
-        title: const Text(
-          'Product Detail',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -58,8 +72,8 @@ class ProductDetailScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(JuselSpacing.s16),
             child: Text(
               'Failed to load product: $e',
-              style: JuselTextStyles.bodyMedium.copyWith(
-                color: JuselColors.destructive,
+              style: JuselTextStyles.bodyMedium(context).copyWith(
+                color: JuselColors.destructiveColor(context),
                 fontWeight: FontWeight.w700,
               ),
               textAlign: TextAlign.center,
@@ -75,7 +89,7 @@ class ProductDetailScreen extends ConsumerWidget {
               ? 0
               : costPrice == 0
               ? 100
-              : ((sellingPrice - costPrice) / sellingPrice) * 100;
+              : ((sellingPrice - costPrice!) / sellingPrice) * 100;
 
           final lastMovement = data.movements.isNotEmpty
               ? data.movements.first
@@ -93,14 +107,16 @@ class ProductDetailScreen extends ConsumerWidget {
                     _InfoRow(
                       label: 'Selling Price',
                       value: 'GHS ${sellingPrice.toStringAsFixed(2)}',
-                      valueColor: JuselColors.primary,
+                      valueColor: JuselColors.primaryColor(context),
                       bold: true,
                       dense: true,
                     ),
                     _DividerRow(),
                     _InfoRow(
                       label: 'Cost Price',
-                      value: 'GHS ${costPrice.toStringAsFixed(2)}',
+                      value: costPrice == null
+                          ? '--'
+                          : 'GHS ${costPrice.toStringAsFixed(2)}',
                       helper: 'Margin: ${margin.toStringAsFixed(0)}%',
                       valueBold: true,
                       helperUnderValue: true,
@@ -125,15 +141,15 @@ class ProductDetailScreen extends ConsumerWidget {
                       label: 'Current Stock',
                       value: '$stock units',
                       valueColor: stock <= 0
-                          ? JuselColors.destructive
-                          : JuselColors.foreground,
+                          ? JuselColors.destructiveColor(context)
+                          : JuselColors.foreground(context),
                       bold: true,
                     ),
                     _DividerRow(),
                     _InfoRow(
                       label: 'Status',
                       value: product.status,
-                      valueColor: _statusColor(product.status),
+                      valueColor: _statusColor(context, product.status),
                       showDot: true,
                       dense: true,
                     ),
@@ -159,8 +175,8 @@ class ProductDetailScreen extends ConsumerWidget {
                         ),
                         child: Text(
                           'No movements recorded yet.',
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -180,7 +196,7 @@ class ProductDetailScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     m.type,
-                                    style: JuselTextStyles.bodyMedium.copyWith(
+                                    style: JuselTextStyles.bodyMedium(context).copyWith(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -188,8 +204,8 @@ class ProductDetailScreen extends ConsumerWidget {
                                     DateFormat(
                                       'MMM d, h:mm a',
                                     ).format(m.createdAt),
-                                    style: JuselTextStyles.bodySmall.copyWith(
-                                      color: JuselColors.mutedForeground,
+                                    style: JuselTextStyles.bodySmall(context).copyWith(
+                                      color: JuselColors.mutedForeground(context),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -197,11 +213,11 @@ class ProductDetailScreen extends ConsumerWidget {
                               ),
                               Text(
                                 '$sign${m.quantityUnits}',
-                                style: JuselTextStyles.bodyMedium.copyWith(
+                                style: JuselTextStyles.bodyMedium(context).copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: m.quantityUnits >= 0
-                                      ? JuselColors.success
-                                      : JuselColors.destructive,
+                                      ? JuselColors.successColor(context)
+                                      : JuselColors.destructiveColor(context),
                                 ),
                               ),
                             ],
@@ -233,13 +249,13 @@ class ProductDetailScreen extends ConsumerWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      backgroundColor: JuselColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: JuselColors.primaryColor(context),
+                      foregroundColor: JuselColors.primaryForeground,
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_circle_outline, color: Colors.white),
+                        Icon(Icons.add_circle_outline, color: JuselColors.primaryForeground),
                         SizedBox(width: JuselSpacing.s8),
                         Text(
                           'Restock Product',
@@ -266,16 +282,17 @@ class ProductDetailScreen extends ConsumerWidget {
           );
         },
       ),
+      ),
     );
   }
 }
 
-Color _statusColor(String status) {
+Color _statusColor(BuildContext context, String status) {
   final s = status.toLowerCase();
-  if (s.contains('out')) return JuselColors.destructive;
-  if (s.contains('low')) return const Color(0xFFF59E0B);
-  if (s.contains('inactive')) return JuselColors.mutedForeground;
-  return const Color(0xFF16A34A);
+  if (s.contains('out')) return JuselColors.destructiveColor(context);
+  if (s.contains('low')) return JuselColors.warningColor(context);
+  if (s.contains('inactive')) return JuselColors.mutedForeground(context);
+  return JuselColors.successColor(context);
 }
 
 class _ProductDetailData {
@@ -301,16 +318,16 @@ class _HeaderCard extends StatelessWidget {
     return 'In Stock';
   }
 
-  Color _statusColor() {
-    if (stock <= 0) return const Color(0xFFEF4444);
-    if (stock <= 10) return const Color(0xFFF59E0B);
-    return const Color(0xFF16A34A);
+  Color _statusColor(BuildContext context) {
+    if (stock <= 0) return JuselColors.destructiveColor(context);
+    if (stock <= 10) return JuselColors.warningColor(context);
+    return JuselColors.successColor(context);
   }
 
-  Color _statusBg() {
-    if (stock <= 0) return const Color(0xFFFFF1F2);
-    if (stock <= 10) return const Color(0xFFFFF7E6);
-    return const Color(0xFFE9F8EF);
+  Color _statusBg(BuildContext context) {
+    if (stock <= 0) return JuselColors.destructiveColor(context).withOpacity(0.12);
+    if (stock <= 10) return JuselColors.warningColor(context).withOpacity(0.12);
+    return JuselColors.successColor(context).withOpacity(0.12);
   }
 
   @override
@@ -318,9 +335,9 @@ class _HeaderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       child: Row(
         children: [
@@ -329,13 +346,13 @@ class _HeaderCard extends StatelessWidget {
             height: 70,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFFF1F5F9),
+              color: JuselColors.muted(context),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: const Icon(
+              child: Icon(
                 Icons.image_outlined,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           ),
@@ -346,13 +363,13 @@ class _HeaderCard extends StatelessWidget {
               children: [
                 _StatusPill(
                   label: _statusLabel(),
-                  color: _statusColor(),
-                  background: _statusBg(),
+                  color: _statusColor(context),
+                  background: _statusBg(context),
                 ),
                 const SizedBox(height: JuselSpacing.s6),
                 Text(
                   product.name,
-                  style: JuselTextStyles.bodyLarge.copyWith(
+                  style: JuselTextStyles.bodyLarge(context).copyWith(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
@@ -360,8 +377,8 @@ class _HeaderCard extends StatelessWidget {
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
                   'Category: ${product.category}',
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
@@ -385,9 +402,9 @@ class _InfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,8 +451,8 @@ class _InfoRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
                   ),
@@ -443,8 +460,8 @@ class _InfoRow extends StatelessWidget {
                 if (helper != null && !helperUnderValue)
                   Text(
                     helper!,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -456,8 +473,8 @@ class _InfoRow extends StatelessWidget {
               width: 8,
               height: 8,
               margin: const EdgeInsets.only(right: JuselSpacing.s6),
-              decoration: const BoxDecoration(
-                color: JuselColors.success,
+              decoration: BoxDecoration(
+                color: JuselColors.successColor(context),
                 shape: BoxShape.circle,
               ),
             ),
@@ -467,18 +484,18 @@ class _InfoRow extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: (bold || valueBold)
                       ? FontWeight.w800
                       : FontWeight.w700,
-                  color: valueColor ?? JuselColors.foreground,
+                  color: valueColor ?? JuselColors.foreground(context),
                 ),
               ),
               if (helper != null && helperUnderValue)
                 Text(
                   helper!,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -493,7 +510,7 @@ class _InfoRow extends StatelessWidget {
 class _DividerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Divider(height: 16, color: Color(0xFFE5E7EB), thickness: 1);
+    return Divider(height: 16, color: JuselColors.border(context), thickness: 1);
   }
 }
 
@@ -507,9 +524,9 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: JuselSpacing.s6),
       child: Text(
         text,
-        style: JuselTextStyles.bodyMedium.copyWith(
+        style: JuselTextStyles.bodyMedium(context).copyWith(
           fontWeight: FontWeight.w700,
-          color: JuselColors.foreground,
+          color: JuselColors.foreground(context),
         ),
       ),
     );
@@ -524,7 +541,7 @@ class _NavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: JuselColors.card(context),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -539,16 +556,16 @@ class _NavTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                     fontSize: 15,
                   ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
             ],
           ),

@@ -32,6 +32,9 @@ class StockMovementsTable extends Table {
   // Profit for sales
   RealColumn get profit => real().nullable()();
 
+  // Payment method for sales: 'cash' or 'mobile_money' (nullable for non-sale movements)
+  TextColumn get paymentMethod => text().nullable()();
+
   // Optional reason (e.g., "expired", "correction", "apprentice return")
   TextColumn get reason => text().nullable()();
 

@@ -97,8 +97,8 @@ class _AppThemeScreenState extends State<AppThemeScreen> {
                       constraints: const BoxConstraints(maxWidth: 520),
                       child: Text(
                         '"System Default" will automatically adjust the appearance based on your device\'s display settings.',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                         textAlign: TextAlign.left,
@@ -131,15 +131,15 @@ class _ThemePreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = selected
-        ? JuselColors.primary
-        : const Color(0xFFE5E7EB);
+        ? JuselColors.primaryColor(context)
+        : JuselColors.border(context);
     final overlayColor = selected
-        ? JuselColors.primary.withOpacity(0.08)
+        ? JuselColors.primaryColor(context).withOpacity(0.08)
         : Colors.transparent;
-    final bgColor = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final placeholder = isDark
-        ? const Color(0xFF1F2937)
-        : const Color(0xFFF1F5F9);
+    final bgColor = isDark
+        ? JuselColors.background(context)
+        : JuselColors.card(context);
+    final placeholder = JuselColors.muted(context);
 
     return Expanded(
       child: InkWell(
@@ -219,9 +219,9 @@ class _ThemePreviewCard extends StatelessWidget {
             const SizedBox(height: JuselSpacing.s8),
             Text(
               label,
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w700,
-                color: JuselColors.foreground,
+                color: JuselColors.foreground(context),
               ),
             ),
           ],
@@ -247,8 +247,8 @@ class _SettingsSection extends StatelessWidget {
           children: [
             Text(
               title,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 letterSpacing: 0.1,
@@ -257,9 +257,9 @@ class _SettingsSection extends StatelessWidget {
             const SizedBox(height: JuselSpacing.s8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: JuselColors.card(context),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(color: JuselColors.border(context)),
               ),
               child: Column(
                 children: children.asMap().entries.map((entry) {
@@ -268,9 +268,9 @@ class _SettingsSection extends StatelessWidget {
                     children: [
                       entry.value,
                       if (!isLast)
-                        const Divider(
+                        Divider(
                           height: 1,
-                          color: Color(0xFFE5E7EB),
+                          color: JuselColors.border(context),
                           thickness: 1,
                         ),
                     ],
@@ -300,10 +300,12 @@ class _ThemeOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tileColor = selected ? const Color(0xFFE9F0FF) : Colors.white;
+    final tileColor = selected
+        ? JuselColors.primaryColor(context).withOpacity(0.12)
+        : JuselColors.card(context);
     final borderColor = selected
-        ? JuselColors.primary.withOpacity(0.3)
-        : Colors.transparent;
+        ? JuselColors.primaryColor(context).withOpacity(0.3)
+        : JuselColors.border(context);
 
     return Material(
       color: tileColor,
@@ -326,28 +328,28 @@ class _ThemeOptionTile extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: selected
-                      ? JuselColors.primary.withOpacity(0.12)
-                      : JuselColors.muted,
+                      ? JuselColors.primaryColor(context).withOpacity(0.12)
+                      : JuselColors.muted(context),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   icon,
                   color: selected
-                      ? JuselColors.primary
-                      : JuselColors.foreground,
+                      ? JuselColors.primaryColor(context)
+                      : JuselColors.foreground(context),
                 ),
               ),
               const SizedBox(width: JuselSpacing.s12),
               Expanded(
                 child: Text(
                   label,
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                   ),
                 ),
               ),
-              if (selected) const Icon(Icons.check, color: JuselColors.primary),
+              if (selected) Icon(Icons.check, color: JuselColors.primaryColor(context)),
             ],
           ),
         ),

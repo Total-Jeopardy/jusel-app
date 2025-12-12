@@ -25,9 +25,9 @@ class JuselButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonStyle = _getButtonStyle();
+    final buttonStyle = _getButtonStyle(context);
     final padding = _getPadding();
-    final textStyle = _getTextStyle();
+    final textStyle = _getTextStyle(context);
 
     Widget button = ElevatedButton(
       onPressed: onPressed,
@@ -55,22 +55,24 @@ class JuselButton extends StatelessWidget {
     return button;
   }
 
-  ButtonStyle _getButtonStyle() {
+  ButtonStyle _getButtonStyle(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     switch (variant) {
       case JuselButtonVariant.primary:
         return ElevatedButton.styleFrom(
-          backgroundColor: JuselColors.primary,
+          backgroundColor: JuselColors.primaryColor(context),
           foregroundColor: JuselColors.primaryForeground,
-          elevation: 1,
+          elevation: isDark ? 0 : 1,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
         );
       case JuselButtonVariant.secondary:
         return ElevatedButton.styleFrom(
-          backgroundColor: JuselColors.secondary,
+          backgroundColor: JuselColors.secondaryColor(context),
           foregroundColor: JuselColors.secondaryForeground,
-          elevation: 1,
+          elevation: isDark ? 0 : 1,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
@@ -78,9 +80,9 @@ class JuselButton extends StatelessWidget {
       case JuselButtonVariant.outline:
         return ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
-          foregroundColor: JuselColors.primary,
+          foregroundColor: JuselColors.primaryColor(context),
           elevation: 0,
-          side: const BorderSide(color: JuselColors.primary),
+          side: BorderSide(color: JuselColors.primaryColor(context)),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
           ),
@@ -88,7 +90,7 @@ class JuselButton extends StatelessWidget {
       case JuselButtonVariant.ghost:
         return ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
-          foregroundColor: JuselColors.foreground,
+          foregroundColor: JuselColors.foreground(context),
           elevation: 0,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(JuselRadii.medium),
@@ -117,14 +119,20 @@ class JuselButton extends StatelessWidget {
     }
   }
 
-  TextStyle _getTextStyle() {
+  TextStyle _getTextStyle(BuildContext context) {
     switch (size) {
       case JuselButtonSize.small:
-        return JuselTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600);
+        return JuselTextStyles.bodySmall(context).copyWith(
+          fontWeight: FontWeight.w600,
+        );
       case JuselButtonSize.medium:
-        return JuselTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600);
+        return JuselTextStyles.bodyMedium(context).copyWith(
+          fontWeight: FontWeight.w600,
+        );
       case JuselButtonSize.large:
-        return JuselTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600);
+        return JuselTextStyles.bodyLarge(context).copyWith(
+          fontWeight: FontWeight.w600,
+        );
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_provider.dart';
 import 'package:jusel_app/features/sales/models/cart_item.dart';
 import 'package:jusel_app/features/sales/providers/cart_provider.dart';
 import 'package:jusel_app/features/sales/view/sales_completed_screen.dart';
@@ -20,16 +21,16 @@ class CartView extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.shopping_cart_outlined,
               size: 64,
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
             ),
             const SizedBox(height: JuselSpacing.s16),
             Text(
               'Your cart is empty',
-              style: JuselTextStyles.bodyMedium.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodyMedium(context).copyWith(
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           ],
@@ -46,15 +47,15 @@ class CartView extends ConsumerWidget {
             children: [
               Text(
                 'Cart',
-                style: JuselTextStyles.headlineLarge.copyWith(
+                style: JuselTextStyles.headlineLarge(context).copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: JuselSpacing.s8),
               Text(
                 '${cart.itemCount} items',
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
             ],
@@ -80,7 +81,7 @@ class CartView extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: JuselColors.card(context),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -95,10 +96,10 @@ class CartView extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total Amount', style: JuselTextStyles.bodyLarge),
+                  Text('Total Amount', style: JuselTextStyles.bodyLarge(context)),
                   Text(
                     'GHS ${cart.totalAmount.toStringAsFixed(2)}',
-                    style: JuselTextStyles.headlineMedium.copyWith(
+                    style: JuselTextStyles.headlineMedium(context).copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -112,8 +113,8 @@ class CartView extends ConsumerWidget {
                 child: ElevatedButton(
                   onPressed: () => _handleFinalizeSale(context, ref),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1ECB7F),
-                    foregroundColor: Colors.white,
+                    backgroundColor: JuselColors.secondaryColor(context),
+                    foregroundColor: JuselColors.secondaryForeground,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -125,13 +126,13 @@ class CartView extends ConsumerWidget {
                     children: [
                       Text(
                         'Finalize Sale',
-                        style: JuselTextStyles.bodyLarge.copyWith(
+                        style: JuselTextStyles.bodyLarge(context).copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: JuselColors.secondaryForeground,
                         ),
                       ),
                       const SizedBox(width: JuselSpacing.s8),
-                      const Icon(Icons.arrow_forward, size: 20),
+                      Icon(Icons.arrow_forward, size: 20),
                     ],
                   ),
                 ),
@@ -162,6 +163,17 @@ class CartView extends ConsumerWidget {
       return;
     }
 
+    final proceed = await _showFinalizeSaleDialog(
+      context,
+      total: cart.totalAmount,
+      itemCount: cart.itemCount,
+    );
+    if (!proceed) return;
+
+    // Get payment method from user
+    final paymentMethod = await _showPaymentMethodDialog(context);
+    if (paymentMethod == null) return; // User cancelled
+
     // Show loading dialog
     if (context.mounted) {
       showDialog(
@@ -175,17 +187,24 @@ class CartView extends ConsumerWidget {
       // Process each item in the cart
       final itemsSnapshot = List<CartItem>.from(cart.items);
       final subtotal = cart.totalAmount;
+      double totalProfit = 0;
       for (final item in cart.items) {
-        await salesService.sellProduct(
+        final summary = await salesService.sellProduct(
           productId: item.productId,
           quantity: item.quantity,
           createdByUserId: user.uid,
+          paymentMethod: paymentMethod,
           overriddenPrice: item.overriddenPrice,
+          priceOverrideReason: item.overrideReason,
         );
+        totalProfit += summary.profit;
       }
 
       // Clear cart after successful sale
       cartNotifier.clearCart();
+
+      // Invalidate dashboard to refresh metrics/low stock
+      ref.invalidate(dashboardProvider);
 
       if (context.mounted) {
         Navigator.of(context).pop(); // Close loading dialog
@@ -194,8 +213,9 @@ class CartView extends ConsumerWidget {
             builder: (_) => SalesCompletedScreen(
               items: itemsSnapshot,
               subtotal: subtotal,
+              netProfit: totalProfit,
               sellerName: user.displayName ?? 'Sales User',
-              paymentMethod: 'Cash',
+              paymentMethod: paymentMethod == 'cash' ? 'Cash' : 'Mobile Money',
             ),
           ),
         );
@@ -206,11 +226,156 @@ class CartView extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
     }
+  }
+
+  Future<bool> _showFinalizeSaleDialog(
+    BuildContext context, {
+    required double total,
+    required int itemCount,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: JuselColors.card(context),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: JuselColors.successColor(context)),
+                const SizedBox(width: 8),
+                const Text('Finalize Sale?'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total: GHS ${total.toStringAsFixed(2)}',
+                  style: JuselTextStyles.bodyMedium(context).copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Items: $itemCount',
+                  style: JuselTextStyles.bodyMedium(context),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Proceed with this sale?',
+                  style: JuselTextStyles.bodySmall(context).copyWith(color: JuselColors.mutedForeground(context)),
+                ),
+              ],
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Review'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: JuselColors.primaryColor(context),
+                  foregroundColor: JuselColors.primaryForeground,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<String?> _showPaymentMethodDialog(BuildContext context) async {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: JuselColors.card(context),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.payment, color: JuselColors.primaryColor(context)),
+            const SizedBox(width: 8),
+            const Text('Payment Method'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PaymentMethodOption(
+              icon: Icons.money,
+              label: 'Cash',
+              value: 'cash',
+              onTap: () => Navigator.of(context).pop('cash'),
+            ),
+            const SizedBox(height: JuselSpacing.s12),
+            _PaymentMethodOption(
+              icon: Icons.account_balance_wallet,
+              label: 'Mobile Money',
+              value: 'mobile_money',
+              onTap: () => Navigator.of(context).pop('mobile_money'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentMethodOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _PaymentMethodOption({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(JuselSpacing.s16),
+        decoration: BoxDecoration(
+          border: Border.all(color: JuselColors.border(context)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: JuselColors.primaryColor(context), size: 24),
+            const SizedBox(width: JuselSpacing.s12),
+            Text(
+              label,
+              style: JuselTextStyles.bodyLarge(context).copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: JuselColors.mutedForeground(context),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -226,7 +391,7 @@ class _CartItemCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: JuselSpacing.s12),
       padding: const EdgeInsets.all(JuselSpacing.s16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: JuselColors.muted(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -235,29 +400,51 @@ class _CartItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.productName, style: JuselTextStyles.bodyLarge),
+                Text(item.productName, style: JuselTextStyles.bodyLarge(context)),
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
                   '${item.quantity} x GHS ${item.effectivePrice.toStringAsFixed(2)}',
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                   ),
                 ),
+                if (item.overrideReason != null) ...[
+                  const SizedBox(height: JuselSpacing.s4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: JuselColors.primaryColor(context),
+                      ),
+                      const SizedBox(width: JuselSpacing.s6),
+                      Expanded(
+                        child: Text(
+                          'Override reason: ${item.overrideReason}',
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           Text(
             'GHS ${item.total.toStringAsFixed(2)}',
-            style: JuselTextStyles.bodyLarge.copyWith(
+            style: JuselTextStyles.bodyLarge(context).copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(width: JuselSpacing.s8),
           GestureDetector(
             onTap: onDelete,
-            child: const Icon(
+            child: Icon(
               Icons.delete_outline,
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
               size: 20,
             ),
           ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,8 +8,10 @@ import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
-import 'package:jusel_app/core/utils/navigation_helper.dart';
+import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_provider.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 import 'package:jusel_app/features/stock/view/restock_success_screen.dart';
 
 class RestockScreen extends ConsumerStatefulWidget {
@@ -88,19 +91,58 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
     final productsAsync = ref.watch(_restockProductsProvider);
     final newTotalStock = _previousStock + _totalUnitsAdding;
 
-    return Scaffold(
-      backgroundColor: JuselColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            ref.read(dashboardTabProvider.notifier).goToDashboard();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: JuselColors.background(context),
+        appBar: AppBar(
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                ref.read(dashboardTabProvider.notifier).goToDashboard();
+              }
+            },
         ),
         title: const Text(
           'Restock',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         centerTitle: false,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: JuselSpacing.s12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(25),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AccountScreen()),
+                );
+              },
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: JuselColors.muted(context),
+                child: Icon(
+                  Icons.person,
+                  size: 20,
+                  color: JuselColors.mutedForeground(context),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -108,31 +150,63 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Divider(height: 1, color: JuselColors.border(context)),
               const SizedBox(height: JuselSpacing.s16),
               Text(
                 'Product',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w600,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
               const SizedBox(height: JuselSpacing.s12),
               productsAsync.when(
                 loading: () => const _ProductCard(),
-                error: (e, _) => _ProductCard(
-                  errorText: 'Failed to load products',
-                ),
+                error: (e, _) =>
+                    const _ProductCard(errorText: 'Failed to load products'),
                 data: (products) {
-                  if (!_initializedSelection && products.isNotEmpty) {
-                    final initialId =
-                        _selectedProductId ?? widget.productId ?? '';
-                    final selected = products.firstWhere(
-                      (p) => p.product.id == initialId,
-                      orElse: () => products.first,
-                    );
-                    _selectedProductId = selected.product.id;
-                    _selectedProduct = selected;
+                  // Provider already filters to isProduced == false, so use directly
+                  // Double-check: ensure no produced items slipped through
+                  final eligibleProducts = products
+                      .where((p) => p.product.isProduced == false)
+                      .toList();
+
+                  if (!_initializedSelection) {
+                    final explicitId = _selectedProductId ?? widget.productId;
+                    if (explicitId != null && explicitId.isNotEmpty) {
+                      final match = eligibleProducts
+                          .where((p) => p.product.id == explicitId)
+                          .toList();
+                      if (match.isNotEmpty) {
+                        _selectedProductId = match.first.product.id;
+                        _selectedProduct = match.first;
+                      } else {
+                        // Product ID was provided but not found in eligible products
+                        // Check if it's a produced product
+                        WidgetsBinding.instance.addPostFrameCallback((_) async {
+                          final db = ref.read(appDatabaseProvider);
+                          final product = await db.productsDao.getProduct(
+                            explicitId,
+                          );
+                          if (product != null && product.isProduced == true) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'This product is locally produced. Please use "Add Batch" instead of Restock.',
+                                      ),
+                                      backgroundColor: JuselColors.warningColor(context),
+                                  duration: Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          }
+                        });
+                        // Clear the invalid selection
+                        _selectedProductId = null;
+                        _selectedProduct = null;
+                      }
+                    }
                     _initializedSelection = true;
                   }
                   final summary = _selectedProduct == null
@@ -143,22 +217,45 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                           currentStock: _selectedProduct!.stock,
                           imageAsset: widget.imageAsset,
                         );
+
                   return _ProductCard(
                     product: summary,
-                    onTap: products.isEmpty
+                    onTap: eligibleProducts.isEmpty
                         ? null
                         : () async {
                             final choice = await showModalBottomSheet<String>(
                               context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
+                              ),
                               builder: (context) => _ProductPicker(
-                                products: products,
+                                products: eligibleProducts,
                                 selectedId: _selectedProductId,
                               ),
                             );
                             if (choice == null) return;
-                            final selected = products.firstWhere(
+                            final selected = eligibleProducts.firstWhere(
                               (p) => p.product.id == choice,
                             );
+                            // Final safety check (should never be true if provider works correctly)
+                            if (selected.product.isProduced == true) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'This product is locally produced. Please use "Add Batch" instead of Restock.',
+                                    ),
+                                    backgroundColor: JuselColors.warningColor(context),
+                                    duration: Duration(seconds: 4),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
                             setState(() {
                               _selectedProductId = choice;
                               _selectedProduct = selected;
@@ -174,9 +271,9 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
               const SizedBox(height: JuselSpacing.s24),
               Text(
                 'Restock Mode',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w600,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
               const SizedBox(height: JuselSpacing.s12),
@@ -215,10 +312,12 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
               const SizedBox(height: JuselSpacing.s20),
               SizedBox(
                 width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _submitting || !_isFormValid ? null : _handleConfirm,
+                child: ElevatedButton(
+                  onPressed: _submitting || !_isFormValid
+                      ? null
+                      : _handleConfirm,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: JuselColors.primary,
+                    backgroundColor: JuselColors.primaryColor(context),
                     foregroundColor: JuselColors.primaryForeground,
                     padding: const EdgeInsets.symmetric(
                       vertical: JuselSpacing.s16,
@@ -234,7 +333,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                              JuselColors.primaryForeground,
                             ),
                           ),
                         )
@@ -252,6 +351,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -267,7 +367,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: JuselColors.destructive,
+        backgroundColor: JuselColors.destructiveColor(context),
       ),
     );
   }
@@ -324,6 +424,9 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
         );
       }
 
+      // Invalidate dashboard to refresh metrics/low stock
+      ref.invalidate(dashboardProvider);
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -361,90 +464,560 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      elevation: 1,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(JuselSpacing.s16),
-          child: Row(
-            children: [
+    // Use GestureDetector for reliable touch handling on physical devices
+    // Wrap with Material + InkWell for visual feedback
+    return GestureDetector(
+      // Explicitly set behavior to ensure entire area is tappable
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          margin: EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: JuselColors.card(context),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            // Explicitly set splash and highlight colors for better feedback
+            splashColor: JuselColors.primaryColor(context).withOpacity(0.1),
+            highlightColor: JuselColors.primaryColor(context).withOpacity(0.05),
+            // Ensure the entire area is tappable
+            child: Padding(
+            padding: const EdgeInsets.all(JuselSpacing.s16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (errorText != null)
+                        Text(
+                          errorText!,
+                          style: JuselTextStyles.bodyMedium(context).copyWith(
+                            color: JuselColors.destructiveColor(context),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else if (product == null)
+                        Text(
+                          'Select a product to restock',
+                          style: JuselTextStyles.headlineSmall(context).copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: JuselColors.foreground(context),
+                          ),
+                        )
+                      else ...[
+                        Text(
+                          product!.name,
+                          style: JuselTextStyles.headlineSmall(context).copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: JuselColors.foreground(context),
+                          ),
+                        ),
+                        const SizedBox(height: JuselSpacing.s4),
+                        Text(
+                          'Category: ${product!.category}',
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
+                          ),
+                        ),
+                        const SizedBox(height: JuselSpacing.s12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: JuselColors.destructiveColor(context).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: JuselColors.destructiveColor(context),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Current Stock: ${product!.currentStock} units',
+                                style: JuselTextStyles.bodySmall(context).copyWith(
+                                  color: JuselColors.destructiveColor(context),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: JuselColors.mutedForeground(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+class _ProductPicker extends StatefulWidget {
+  final List<_ProductOption> products;
+  final String? selectedId;
+
+  const _ProductPicker({required this.products, required this.selectedId});
+
+  @override
+  State<_ProductPicker> createState() => _ProductPickerState();
+}
+
+class _ProductPickerState extends State<_ProductPicker> {
+  late TextEditingController _searchController;
+  String _searchQuery = '';
+  Timer? _debounceTimer;
+  Map<String, List<_ProductOption>>? _cachedGrouped;
+  String? _cachedQuery;
+  _PickerFilter _activeFilter = const _PickerFilter.all();
+  static const int _lowStockThreshold = 5;
+
+  // Safety: Ensure only non-produced products are shown
+  List<_ProductOption> get _safeProducts =>
+      widget.products.where((p) => p.product.isProduced == false).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = value.toLowerCase().trim();
+        });
+      }
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _cachedGrouped = null;
+      _cachedQuery = null;
+      _activeFilter = const _PickerFilter.all();
+    });
+  }
+
+  List<_ProductOption> _filterProducts(List<_ProductOption> products) {
+    if (_searchQuery.isEmpty) return products;
+    return products.where((option) {
+      final name = option.product.name.toLowerCase();
+      final category = option.product.category.toLowerCase();
+      return name.contains(_searchQuery) || category.contains(_searchQuery);
+    }).toList();
+  }
+
+  Map<String, List<_ProductOption>> _groupByCategory(
+    List<_ProductOption> products,
+  ) {
+    final grouped = <String, List<_ProductOption>>{};
+    for (final option in products) {
+      final category = option.product.category;
+      grouped.putIfAbsent(category, () => []).add(option);
+    }
+    final sortedEntries = grouped.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return Map.fromEntries(sortedEntries);
+  }
+
+  Map<String, List<_ProductOption>> get _groupedProducts {
+    if (_cachedQuery == _searchQuery && _cachedGrouped != null) {
+      return _cachedGrouped!;
+    }
+    final filtered = _applyFilters(_filterProducts(_safeProducts));
+    _cachedGrouped = _groupByCategory(filtered);
+    _cachedQuery = _searchQuery;
+    return _cachedGrouped!;
+  }
+
+  int get _filteredCount =>
+      _applyFilters(_filterProducts(_safeProducts)).length;
+
+  List<_PickerFilter> get _filters {
+    final categories =
+        _safeProducts.map((p) => p.product.category).toSet().toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final categoryFilters = categories
+        .map((c) => _PickerFilter.category(c))
+        .toList();
+    final filters = <_PickerFilter>[
+      const _PickerFilter.all(),
+      const _PickerFilter.lowStock(),
+      const _PickerFilter.recent(),
+    ];
+    filters.addAll(categoryFilters);
+    return filters;
+  }
+
+  List<_ProductOption> _applyFilters(List<_ProductOption> products) {
+    switch (_activeFilter.type) {
+      case _PickerFilterType.all:
+        return products;
+      case _PickerFilterType.category:
+        final cat = _activeFilter.value?.toLowerCase() ?? '';
+        return products
+            .where((p) => (p.product.category.toLowerCase() == cat))
+            .toList();
+      case _PickerFilterType.lowStock:
+        return products.where((p) => p.stock <= _lowStockThreshold).toList();
+      case _PickerFilterType.recent:
+        if (widget.selectedId == null || widget.selectedId!.isEmpty) {
+          return <_ProductOption>[];
+        }
+        return products
+            .where((p) => p.product.id == widget.selectedId)
+            .toList();
+    }
+  }
+
+  int _getTotalItemCount(Map<String, List<_ProductOption>> grouped) {
+    var count = 0;
+    for (final entry in grouped.entries) {
+      count += 1; // header
+      count += entry.value.length;
+    }
+    return count;
+  }
+
+  Widget _buildGroupedItem(
+    Map<String, List<_ProductOption>> grouped,
+    int index,
+  ) {
+    var currentIndex = 0;
+    for (final entry in grouped.entries) {
+      final category = entry.key;
+      final items = entry.value;
+      if (index == currentIndex) {
+        return _CategoryHeader(category: category);
+      }
+      currentIndex += 1;
+      for (final item in items) {
+        if (index == currentIndex) {
+          final selected = widget.selectedId == item.product.id;
+          return _ProductPickerItem(
+            option: item,
+            selected: selected,
+            onTap: () => Navigator.pop(context, item.product.id),
+          );
+        }
+        currentIndex += 1;
+      }
+    }
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+    final grouped = _groupedProducts;
+    return SafeArea(
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        decoration: BoxDecoration(
+          color: JuselColors.card(context),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 12,
+              offset: Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Select Product',
+                          style: JuselTextStyles.headlineSmall(context).copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: JuselColors.muted(context).withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _searchQuery.isEmpty
+                                ? '${_safeProducts.length} products'
+                                : '$_filteredCount results',
+                            style: JuselTextStyles.bodySmall(context).copyWith(
+                              color: JuselColors.mutedForeground(context),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    color: JuselColors.mutedForeground(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                decoration: InputDecoration(
+                  hintText: 'Search products...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: _clearSearch,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: JuselColors.muted(context),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: JuselColors.border(context)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: JuselColors.border(context)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: JuselColors.primaryColor(context),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: _filters
+                    .map(
+                      (filter) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(filter.label),
+                          selected: _activeFilter == filter,
+                          onSelected: (_) => setState(() {
+                            _activeFilter = filter;
+                            _cachedGrouped = null;
+                            _cachedQuery = null;
+                          }),
+                          labelStyle: JuselTextStyles.bodySmall(context).copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: _activeFilter == filter
+                                ? JuselColors.primaryForeground
+                                : JuselColors.foreground(context),
+                          ),
+                          selectedColor: JuselColors.primaryColor(context),
+                          backgroundColor: JuselColors.card(context),
+                          side: BorderSide(color: JuselColors.border(context)),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            if (_safeProducts.isEmpty)
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (errorText != null)
-                      Text(
-                        errorText!,
-                        style: JuselTextStyles.bodyMedium.copyWith(
-                          color: JuselColors.destructive,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(JuselSpacing.s24),
+                    child: Text(
+                      'No products available',
+                      style: JuselTextStyles.bodyMedium(context),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: grouped.isEmpty
+                    ? _EmptySearchState(
+                        query: _searchQuery,
+                        onClear: _clearSearch,
                       )
-                    else if (product == null)
-                      Text(
-                        'Select a product to restock',
-                        style: JuselTextStyles.headlineSmall.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: JuselColors.foreground,
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(
+                          bottom: JuselSpacing.s20,
                         ),
-                      )
-                    else ...[
+                        itemCount: _getTotalItemCount(grouped),
+                        itemBuilder: (context, index) =>
+                            _buildGroupedItem(grouped, index),
+                      ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductPickerItem extends StatelessWidget {
+  final _ProductOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ProductPickerItem({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final highlightColor = JuselColors.primaryColor(context).withOpacity(0.08);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Material(
+        color: selected ? highlightColor : JuselColors.card(context),
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(JuselSpacing.s16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? JuselColors.primaryColor(context) : JuselColors.border(context),
+                width: selected ? 1.5 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        product!.name,
-                        style: JuselTextStyles.headlineSmall.copyWith(
+                        option.product.name,
+                        style: JuselTextStyles.bodyLarge(context).copyWith(
                           fontWeight: FontWeight.w700,
-                          color: JuselColors.foreground,
                         ),
                       ),
                       const SizedBox(height: JuselSpacing.s4),
                       Text(
-                        'Category: ${product!.category}',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        'Category: ${option.product.category}',
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: JuselSpacing.s12),
+                      const SizedBox(height: JuselSpacing.s8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF1F2),
-                          borderRadius: BorderRadius.circular(12),
+                          color: JuselColors.successColor(context).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: JuselColors.destructive,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Current Stock: ${product!.currentStock} units',
-                              style: JuselTextStyles.bodySmall.copyWith(
-                                color: JuselColors.destructive,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          '${option.stock} in stock',
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.successColor(context),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: JuselColors.mutedForeground,
-              ),
-            ],
+                const SizedBox(width: JuselSpacing.s12),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: selected ? JuselColors.primaryColor(context) : JuselColors.muted(context),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    selected ? Icons.check : Icons.chevron_right,
+                    size: 16,
+                    color: selected
+                        ? JuselColors.primaryForeground
+                        : JuselColors.mutedForeground(context),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -452,88 +1025,119 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-class _ProductPicker extends StatelessWidget {
-  final List<_ProductOption> products;
-  final String? selectedId;
+class _CategoryHeader extends StatelessWidget {
+  final String category;
 
-  const _ProductPicker({
-    required this.products,
-    required this.selectedId,
-  });
+  const _CategoryHeader({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: JuselColors.mutedForeground.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: JuselColors.muted(context).withOpacity(0.3),
+        border: Border(
+          bottom: BorderSide(
+            color: JuselColors.border(context).withOpacity(0.5),
+            width: 1,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: JuselSpacing.s16,
-              vertical: JuselSpacing.s8,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Select Product',
-                  style: JuselTextStyles.headlineSmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  '${products.length} total',
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Flexible(
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: products.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = products[index];
-                final selected = selectedId == item.product.id;
-                return ListTile(
-                  onTap: () => Navigator.pop(context, item.product.id),
-                  title: Text(
-                    item.product.name,
-                    style: JuselTextStyles.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Category: ${item.product.category} · Stock: ${item.stock}',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  trailing: selected
-                      ? const Icon(Icons.check, color: JuselColors.primary)
-                      : null,
-                );
-              },
-            ),
-          ),
-        ],
+        ),
+      ),
+      child: Text(
+        category,
+        style: JuselTextStyles.bodyMedium(context).copyWith(
+          fontWeight: FontWeight.w700,
+          color: JuselColors.foreground(context),
+        ),
       ),
     );
   }
+}
+
+class _EmptySearchState extends StatelessWidget {
+  final String query;
+  final VoidCallback onClear;
+
+  const _EmptySearchState({required this.query, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(JuselSpacing.s24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 48,
+              color: JuselColors.mutedForeground(context).withOpacity(0.5),
+            ),
+            const SizedBox(height: JuselSpacing.s16),
+            Text(
+              'No results for "$query"',
+              style: JuselTextStyles.bodyLarge(context).copyWith(
+                fontWeight: FontWeight.w700,
+                color: JuselColors.foreground(context),
+              ),
+            ),
+            const SizedBox(height: JuselSpacing.s8),
+            Text(
+              'Try a different search term',
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
+              ),
+            ),
+            const SizedBox(height: JuselSpacing.s16),
+            TextButton(
+              onPressed: onClear,
+              child: Text(
+                'Clear search',
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  color: JuselColors.primaryColor(context),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _PickerFilterType { all, category, lowStock, recent }
+
+class _PickerFilter {
+  final String label;
+  final _PickerFilterType type;
+  final String? value;
+
+  const _PickerFilter._(this.label, this.type, [this.value]);
+
+  const _PickerFilter.all() : this._('All', _PickerFilterType.all);
+
+  const _PickerFilter.lowStock()
+    : this._('Low stock', _PickerFilterType.lowStock);
+
+  const _PickerFilter.recent()
+    : this._('Recently accessed', _PickerFilterType.recent);
+
+  const _PickerFilter.category(String category)
+    : this._(category, _PickerFilterType.category, category);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _PickerFilter &&
+          runtimeType == other.runtimeType &&
+          label == other.label &&
+          type == other.type &&
+          value == other.value;
+
+  @override
+  int get hashCode => Object.hash(label, type, value);
 }
 
 class _RestockModeCard extends StatelessWidget {
@@ -566,7 +1170,7 @@ class _RestockModeCard extends StatelessWidget {
           children: [
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F6FE),
+                color: JuselColors.primaryColor(context).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -593,9 +1197,7 @@ class _RestockModeCard extends StatelessWidget {
                     controller: packsController,
                     enabled: true,
                     textInputAction: TextInputAction.next,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (_) => onChanged(),
                   ),
                 ),
@@ -606,9 +1208,7 @@ class _RestockModeCard extends StatelessWidget {
                     controller: unitsPerPackController,
                     enabled: isPacks,
                     suffixIcon: const Icon(Icons.edit, size: 18),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: (_) => onChanged(),
                   ),
                 ),
@@ -642,7 +1242,7 @@ class _ModeChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.transparent,
+            color: isActive ? JuselColors.card(context) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             boxShadow: isActive
                 ? const [
@@ -656,11 +1256,11 @@ class _ModeChip extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: JuselTextStyles.bodyMedium.copyWith(
+            style: JuselTextStyles.bodyMedium(context).copyWith(
               fontWeight: FontWeight.w700,
               color: isActive
-                  ? JuselColors.primary
-                  : JuselColors.mutedForeground,
+                  ? JuselColors.primaryColor(context)
+                  : JuselColors.mutedForeground(context),
             ),
           ),
         ),
@@ -695,8 +1295,8 @@ class _LabeledField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -748,8 +1348,8 @@ class _TotalCostCard extends StatelessWidget {
         : ((costPerUnit - previousCostPerUnit) / previousCostPerUnit) * 100;
     final deltaPrefix = delta >= 0 ? '+' : '';
     final deltaColor = delta >= 0
-        ? JuselColors.destructive
-        : JuselColors.success;
+        ? JuselColors.destructiveColor(context)
+        : JuselColors.successColor(context);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -767,7 +1367,7 @@ class _TotalCostCard extends StatelessWidget {
                 vertical: JuselSpacing.s8,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF4FF),
+                color: JuselColors.primaryColor(context).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -775,9 +1375,9 @@ class _TotalCostCard extends StatelessWidget {
                 children: [
                   Text(
                     'Total Units Adding',
-                    style: JuselTextStyles.bodyMedium.copyWith(
+                    style: JuselTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w700,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                   ),
                   Column(
@@ -785,15 +1385,15 @@ class _TotalCostCard extends StatelessWidget {
                     children: [
                       Text(
                         '+$totalUnits',
-                        style: JuselTextStyles.bodyLarge.copyWith(
+                        style: JuselTextStyles.bodyLarge(context).copyWith(
                           fontWeight: FontWeight.w800,
-                          color: JuselColors.primary,
+                          color: JuselColors.primaryColor(context),
                         ),
                       ),
                       Text(
                         'Units',
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -805,8 +1405,8 @@ class _TotalCostCard extends StatelessWidget {
             const SizedBox(height: JuselSpacing.s16),
             Text(
               'Total Cost (GHS)',
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -828,16 +1428,16 @@ class _TotalCostCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calculate_outlined,
                       size: 18,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Cost per Unit',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -845,9 +1445,9 @@ class _TotalCostCard extends StatelessWidget {
                 ),
                 Text(
                   'GHS ${costPerUnit.toStringAsFixed(2)}',
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                   ),
                 ),
               ],
@@ -858,16 +1458,16 @@ class _TotalCostCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.history,
                       size: 18,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Previous Cost',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -877,15 +1477,15 @@ class _TotalCostCard extends StatelessWidget {
                   children: [
                     Text(
                       'GHS ${previousCostPerUnit.toStringAsFixed(2)}',
-                      style: JuselTextStyles.bodyMedium.copyWith(
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
                         fontWeight: FontWeight.w600,
-                        color: JuselColors.foreground,
+                        color: JuselColors.foreground(context),
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       '$deltaPrefix${delta.toStringAsFixed(0)}%',
-                      style: JuselTextStyles.bodySmall.copyWith(
+                      style: JuselTextStyles.bodySmall(context).copyWith(
                         color: deltaColor,
                         fontWeight: FontWeight.w700,
                       ),
@@ -941,8 +1541,8 @@ class _ImpactSummaryCard extends StatelessWidget {
           children: [
             Text(
               'Impact Summary',
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -952,16 +1552,16 @@ class _ImpactSummaryCard extends StatelessWidget {
               children: [
                 Text(
                   'Previous Stock',
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   '$previousStock units',
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.foreground,
+                    color: JuselColors.foreground(context),
                   ),
                 ),
               ],
@@ -972,22 +1572,22 @@ class _ImpactSummaryCard extends StatelessWidget {
               children: [
                 Text(
                   'Adding',
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    color: JuselColors.primary,
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
+                    color: JuselColors.primaryColor(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   '+$addingUnits units',
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    color: JuselColors.primary,
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
+                    color: JuselColors.primaryColor(context),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: JuselSpacing.s12),
-            const Divider(height: 1, color: Color(0xFFE5E7EB)),
+            Divider(height: 1, color: JuselColors.border(context)),
             const SizedBox(height: JuselSpacing.s12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -998,16 +1598,16 @@ class _ImpactSummaryCard extends StatelessWidget {
                   children: [
                     Text(
                       'New Total Stock',
-                      style: JuselTextStyles.bodyMedium.copyWith(
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
                         fontWeight: FontWeight.w700,
-                        color: JuselColors.foreground,
+                        color: JuselColors.foreground(context),
                       ),
                     ),
                     const SizedBox(height: JuselSpacing.s6),
                     Text(
                       'Total inventory value: +GHS ${totalInventoryValue.toStringAsFixed(2)}',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                       ),
                     ),
                   ],
@@ -1017,16 +1617,16 @@ class _ImpactSummaryCard extends StatelessWidget {
                   children: [
                     Text(
                       '$newTotalStock',
-                      style: JuselTextStyles.headlineLarge.copyWith(
+                      style: JuselTextStyles.headlineLarge(context).copyWith(
                         fontWeight: FontWeight.w800,
-                        color: JuselColors.foreground,
+                        color: JuselColors.foreground(context),
                       ),
                     ),
                     Text(
                       'units',
-                      style: JuselTextStyles.bodySmall.copyWith(
+                      style: JuselTextStyles.bodySmall(context).copyWith(
                         fontWeight: FontWeight.w700,
-                        color: JuselColors.foreground,
+                        color: JuselColors.foreground(context),
                       ),
                     ),
                   ],
@@ -1037,21 +1637,21 @@ class _ImpactSummaryCard extends StatelessWidget {
             if (willBeAboveThreshold)
               _InfoBanner(
                 icon: Icons.check_circle_outline,
-                iconColor: const Color(0xFF16A34A),
-                backgroundColor: const Color(0xFFE9F8EF),
+                iconColor: JuselColors.successColor(context),
+                backgroundColor: JuselColors.successColor(context).withOpacity(0.12),
                 text:
                     'Stock will be above reorder threshold ($reorderThreshold).',
-                textColor: const Color(0xFF15803D),
+                textColor: JuselColors.successColor(context),
               ),
             if (willBeAboveThreshold) const SizedBox(height: JuselSpacing.s8),
             _InfoBanner(
               icon: Icons.warning_amber_rounded,
-              iconColor: const Color(0xFFF59E0B),
-              backgroundColor: const Color(0xFFFFF7E6),
-              borderColor: const Color(0xFFFDE68A),
+              iconColor: JuselColors.warningColor(context),
+              backgroundColor: JuselColors.warningColor(context).withOpacity(0.15),
+              borderColor: JuselColors.warningColor(context).withOpacity(0.3),
               text:
                   'Margin Alert: New unit cost (GHS ${costPerUnit.toStringAsFixed(2)}) is ${isCostHigher ? 'higher' : 'lower'} than previous average (GHS ${previousCostPerUnit.toStringAsFixed(2)}).',
-              textColor: const Color(0xFF92400E),
+              textColor: JuselColors.warningColor(context),
             ),
           ],
         ),
@@ -1097,7 +1697,7 @@ class _InfoBanner extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: JuselTextStyles.bodySmall.copyWith(
+              style: JuselTextStyles.bodySmall(context).copyWith(
                 color: textColor,
                 fontWeight: FontWeight.w600,
               ),
@@ -1122,6 +1722,7 @@ class _ProductSummary {
     this.imageAsset,
   });
 }
+
 class _ProductOption {
   final ProductsTableData product;
   final int stock;
@@ -1129,14 +1730,18 @@ class _ProductOption {
   const _ProductOption({required this.product, required this.stock});
 }
 
-final _restockProductsProvider =
-    FutureProvider.autoDispose<List<_ProductOption>>((ref) async {
+final _restockProductsProvider = FutureProvider.autoDispose<List<_ProductOption>>((
+  ref,
+) async {
   final db = ref.read(appDatabaseProvider);
   final inventory = ref.read(inventoryServiceProvider);
   final products = await db.productsDao.getAllProducts();
   final stockMap = await inventory.getAllCurrentStock();
-  final active = products.where((p) => p.status.toLowerCase() == 'active');
-  return active
+  // Only include active, non-produced products (produced items use Production Batches)
+  final eligible = products.where(
+    (p) => p.status.toLowerCase() == 'active' && p.isProduced == false,
+  );
+  return eligible
       .map(
         (p) => _ProductOption(
           product: p,

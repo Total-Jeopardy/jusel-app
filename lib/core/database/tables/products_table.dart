@@ -6,14 +6,15 @@ class ProductsTable extends Table {
   TextColumn get name => text()();
   TextColumn get category => text()(); // snack, drink, water
   TextColumn get subcategory => text().nullable()();
-  // soft_drink, local_drink (for drinks only)
+  // e.g. locally_made, purchased, sachet_water, bottle
+  TextColumn get imageUrl => text().nullable()();
 
   BoolColumn get isProduced => boolean()();
-  // true = locally made snacks / local drinks (juices)
+  // true = snacks and locally made drinks
 
   RealColumn get currentSellingPrice => real()();
-  RealColumn get currentCostPrice => real()();
-  // Last batch cost (Option B)
+  RealColumn get currentCostPrice => real().nullable()();
+  // Set by restock/production; null until first cost is recorded
 
   IntColumn get currentStockQty =>
       integer().withDefault(const Constant(0))(); // in units

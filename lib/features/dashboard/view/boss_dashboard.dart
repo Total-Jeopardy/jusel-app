@@ -6,23 +6,23 @@ import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/ui/components/quick_action_card.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_provider.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 import 'package:jusel_app/features/production/view/batch_screen.dart';
 import 'package:jusel_app/features/products/view/products_screen.dart';
+import 'package:jusel_app/features/reports/view/reports_screen.dart';
 import 'package:jusel_app/features/sales/view/sales_screen.dart';
 import 'package:jusel_app/features/stock/view/restock_screen.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 
-class BossDashboard extends StatefulWidget {
+class BossDashboard extends ConsumerStatefulWidget {
   const BossDashboard({super.key});
 
   @override
-  State<BossDashboard> createState() => _BossDashboardState();
+  ConsumerState<BossDashboard> createState() => _BossDashboardState();
 }
 
-class _BossDashboardState extends State<BossDashboard> {
-  int _currentIndex = 0;
-
+class _BossDashboardState extends ConsumerState<BossDashboard> {
   late final List<Widget> _pages;
 
   @override
@@ -33,19 +33,18 @@ class _BossDashboardState extends State<BossDashboard> {
       const ProductsScreen(),
       const SalesScreen(),
       const RestockScreen(),
-      const _ReportsPlaceholder(),
+      const ReportsScreen(),
     ];
   }
 
   void _setTab(int index) {
-    if (index == _currentIndex) return;
-    setState(() {
-      _currentIndex = index;
-    });
+    ref.read(dashboardTabProvider.notifier).setTab(index);
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(dashboardTabProvider);
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -55,10 +54,10 @@ class _BossDashboardState extends State<BossDashboard> {
       },
       child: Scaffold(
         body: SafeArea(
-          child: IndexedStack(index: _currentIndex, children: _pages),
+          child: IndexedStack(index: currentIndex, children: _pages),
         ),
         bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: currentIndex,
           onTap: (i) => _setTab(i),
           type: BottomNavigationBarType.fixed,
           items: const [
@@ -75,29 +74,14 @@ class _BossDashboardState extends State<BossDashboard> {
               label: 'Sales',
             ),
             BottomNavigationBarItem(
-                icon: Icon(Icons.inventory), label: 'Stock'),
+              icon: Icon(Icons.inventory),
+              label: 'Stock',
+            ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bar_chart_outlined),
               label: 'Reports',
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportsPlaceholder extends StatelessWidget {
-  const _ReportsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        'Reports coming soon',
-        style: JuselTextStyles.bodyMedium.copyWith(
-          color: JuselColors.mutedForeground,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -150,8 +134,9 @@ class DashboardHome extends ConsumerWidget {
   }
 }
 
-final lowStockProvider =
-    FutureProvider.autoDispose<List<_LowStockItem>>((ref) async {
+final lowStockProvider = FutureProvider.autoDispose<List<_LowStockItem>>((
+  ref,
+) async {
   final inventory = ref.read(inventoryServiceProvider);
   final products = await inventory.getLowStockProducts();
 
@@ -189,17 +174,17 @@ class _Header extends StatelessWidget {
             children: [
               Text(
                 'Dashboard',
-                style: JuselTextStyles.headlineLarge.copyWith(
+                style: JuselTextStyles.headlineLarge(context).copyWith(
                   fontWeight: FontWeight.w700,
                   fontSize: 32,
-                  color: JuselColors.foreground,
+                  color: JuselColors.foreground(context),
                 ),
               ),
               Text(
                 'Welcome back, Boss',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontSize: 18,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
             ],
@@ -213,13 +198,13 @@ class _Header extends StatelessWidget {
                 vertical: JuselSpacing.s8,
               ),
               decoration: BoxDecoration(
-                color: JuselColors.primary,
+                color: JuselColors.primaryColor(context),
                 borderRadius: BorderRadius.circular(500),
               ),
-              child: const Text(
+              child: Text(
                 'Boss',
                 style: TextStyle(
-                  color: JuselColors.background,
+                  color: JuselColors.background(context),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -233,13 +218,13 @@ class _Header extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const AccountScreen()),
                 );
               },
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 25,
-                backgroundColor: JuselColors.muted,
+                backgroundColor: JuselColors.muted(context),
                 child: Icon(
                   Icons.person,
                   size: 25,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
             ),
@@ -269,10 +254,10 @@ class _QuickActions extends StatelessWidget {
                 label: 'Sale',
                 onTap: () => onNavigateToTab(2),
                 gradientColors: [
-                  const Color(0xFF1F6BFF).withValues(alpha: 0.16),
-                  const Color(0xFF1F6BFF).withValues(alpha: 0.08),
+                  JuselColors.primaryColor(context).withOpacity(0.16),
+                  JuselColors.primaryColor(context).withOpacity(0.08),
                 ],
-                iconColor: const Color(0xFF1F6BFF),
+                iconColor: JuselColors.primaryColor(context),
               ),
               const SizedBox(width: JuselSpacing.s12),
               QuickActionCard(
@@ -280,10 +265,10 @@ class _QuickActions extends StatelessWidget {
                 label: 'Restock',
                 onTap: () => onNavigateToTab(3),
                 gradientColors: [
-                  const Color(0xFF22D3EE).withValues(alpha: 0.16),
-                  const Color(0xFF34D399).withValues(alpha: 0.10),
+                  JuselColors.secondaryColor(context).withOpacity(0.16),
+                  JuselColors.secondaryColor(context).withOpacity(0.10),
                 ],
-                iconColor: const Color(0xFF0EA5E9),
+                iconColor: JuselColors.secondaryColor(context),
               ),
               const SizedBox(width: JuselSpacing.s12),
               QuickActionCard(
@@ -294,10 +279,10 @@ class _QuickActions extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const BatchScreen()),
                 ),
                 gradientColors: [
-                  const Color(0xFF7C5CFF).withValues(alpha: 0.16),
-                  const Color(0xFF38BDF8).withValues(alpha: 0.10),
+                  JuselColors.accentColor(context).withOpacity(0.16),
+                  JuselColors.accentColor(context).withOpacity(0.10),
                 ],
-                iconColor: const Color(0xFF7C5CFF),
+                iconColor: JuselColors.accentColor(context),
               ),
               const SizedBox(width: JuselSpacing.s12),
               QuickActionCard(
@@ -305,10 +290,10 @@ class _QuickActions extends StatelessWidget {
                 label: 'Product',
                 onTap: () => onNavigateToTab(1),
                 gradientColors: [
-                  const Color(0xFF94A3B8).withValues(alpha: 0.18),
-                  const Color(0xFFE2E8F0).withValues(alpha: 0.12),
+                  JuselColors.mutedForeground(context).withOpacity(0.18),
+                  JuselColors.mutedForeground(context).withOpacity(0.12),
                 ],
-                iconColor: const Color(0xFF0F172A),
+                iconColor: JuselColors.foreground(context),
               ),
             ],
           ),
@@ -321,7 +306,7 @@ class _QuickActions extends StatelessWidget {
                 width: 32,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: JuselColors.muted,
+                  color: JuselColors.muted(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -330,7 +315,9 @@ class _QuickActions extends StatelessWidget {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: JuselColors.primary.withValues(alpha: 0.28),
+                  color: JuselColors.primaryColor(
+                    context,
+                  ).withValues(alpha: 0.28),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -356,7 +343,7 @@ class _OverviewGrid extends StatelessWidget {
         value: _formatCurrency(metrics.salesTotal),
         delta: null,
         deltaPositive: false,
-        iconColor: const Color(0xFF1F6BFF),
+        iconColor: JuselColors.primaryColor(context),
       ),
       _OverviewItem(
         title: 'Profit',
@@ -364,8 +351,8 @@ class _OverviewGrid extends StatelessWidget {
         value: _formatCurrency(metrics.profitTotal),
         delta: null,
         deltaPositive: false,
-        valueColor: JuselColors.primary,
-        iconColor: JuselColors.primary,
+        valueColor: JuselColors.primaryColor(context),
+        iconColor: JuselColors.primaryColor(context),
       ),
       _OverviewItem(
         title: 'Inv. Value',
@@ -373,7 +360,7 @@ class _OverviewGrid extends StatelessWidget {
         value: _formatCurrency(metrics.inventoryValue),
         delta: null,
         deltaPositive: false,
-        iconColor: const Color(0xFF10B981),
+        iconColor: JuselColors.successColor(context),
       ),
       _OverviewItem(
         title: 'Prod. Value',
@@ -381,7 +368,7 @@ class _OverviewGrid extends StatelessWidget {
         value: _formatCurrency(metrics.productionValue),
         delta: null,
         deltaPositive: false,
-        iconColor: const Color(0xFFF59E0B),
+        iconColor: JuselColors.warningColor(context),
       ),
       _OverviewItem(
         title: 'Low Stock',
@@ -390,10 +377,10 @@ class _OverviewGrid extends StatelessWidget {
         delta: 'Items need attention',
         deltaPositive: false,
         showDeltaIcon: false,
-        background: const Color(0xFFFFF1F2),
-        valueColor: const Color(0xFFDC2626),
-        titleColor: const Color(0xFFDC2626),
-        iconColor: const Color(0xFFDC2626),
+        background: JuselColors.warningColor(context).withOpacity(0.12),
+        valueColor: JuselColors.warningColor(context),
+        titleColor: JuselColors.warningColor(context),
+        iconColor: JuselColors.warningColor(context),
       ),
       _OverviewItem(
         title: 'Pending Sync',
@@ -402,10 +389,10 @@ class _OverviewGrid extends StatelessWidget {
         delta: 'All synced',
         deltaPositive: false,
         showDeltaIcon: false,
-        iconColor: JuselColors.mutedForeground,
-        deltaColor: JuselColors.mutedForeground,
-        titleColor: JuselColors.mutedForeground,
-        valueColor: JuselColors.foreground,
+        iconColor: JuselColors.mutedForeground(context),
+        deltaColor: JuselColors.mutedForeground(context),
+        titleColor: JuselColors.mutedForeground(context),
+        valueColor: JuselColors.foreground(context),
       ),
     ];
 
@@ -417,16 +404,16 @@ class _OverviewGrid extends StatelessWidget {
           children: [
             Text(
               'Overview',
-              style: JuselTextStyles.headlineMedium.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: JuselTextStyles.headlineMedium(
+                context,
+              ).copyWith(fontWeight: FontWeight.w700),
             ),
             DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: periodOptions.first,
-                icon: const Icon(
+                icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: JuselColors.primary,
+                  color: JuselColors.primaryColor(context),
                 ),
                 items: periodOptions
                     .map(
@@ -434,8 +421,8 @@ class _OverviewGrid extends StatelessWidget {
                         value: p,
                         child: Text(
                           p,
-                          style: JuselTextStyles.bodyMedium.copyWith(
-                            color: JuselColors.primary,
+                          style: JuselTextStyles.bodyMedium(context).copyWith(
+                            color: JuselColors.primaryColor(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -450,17 +437,19 @@ class _OverviewGrid extends StatelessWidget {
         const SizedBox(height: JuselSpacing.s12),
         LayoutBuilder(
           builder: (context, constraints) {
-            final isNarrow = constraints.maxWidth < 360;
-            final crossAxisCount = isNarrow ? 1 : 2;
+            final isCompact = constraints.maxWidth < 540;
+            final crossAxisCount = 2;
+            final aspect = isCompact ? 1.38 : 1.6;
+            final spacing = isCompact ? 10.0 : 12.0;
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: cards.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: isNarrow ? 2.2 : 1.3,
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+                childAspectRatio: aspect,
               ),
               itemBuilder: (_, index) => cards[index],
             );
@@ -503,10 +492,10 @@ class _OverviewItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(JuselSpacing.s16),
       decoration: BoxDecoration(
-        color: background ?? Colors.white,
+        color: background ?? JuselColors.card(context),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: JuselColors.border.withValues(alpha: 0.9),
+          color: JuselColors.border(context).withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),
@@ -518,25 +507,28 @@ class _OverviewItem extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  color: titleColor ?? JuselColors.mutedForeground,
-                  fontWeight: FontWeight.w600,
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  color: titleColor ?? JuselColors.foreground(context),
+                  fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
               ),
               Icon(
                 icon,
                 size: 27,
-                color: iconColor ?? titleColor ?? JuselColors.mutedForeground,
+                color:
+                    iconColor ??
+                    titleColor ??
+                    JuselColors.mutedForeground(context),
               ),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: JuselSpacing.s12),
           Text(
             value,
-            style: JuselTextStyles.headlineLarge.copyWith(
+            style: JuselTextStyles.headlineLarge(context).copyWith(
               fontWeight: FontWeight.w800,
-              color: valueColor ?? JuselColors.foreground,
+              color: valueColor ?? JuselColors.foreground(context),
             ),
           ),
           if (delta != null) ...[
@@ -548,19 +540,19 @@ class _OverviewItem extends StatelessWidget {
                     deltaPositive ? Icons.trending_up : Icons.trending_down,
                     size: 22,
                     color: deltaPositive
-                        ? JuselColors.primary
-                        : const Color(0xFFDC2626),
+                        ? JuselColors.primaryColor(context)
+                        : JuselColors.destructiveColor(context),
                   ),
                   const SizedBox(width: 6),
                 ],
                 Text(
                   delta!,
-                  style: JuselTextStyles.bodySmall.copyWith(
+                  style: JuselTextStyles.bodySmall(context).copyWith(
                     color:
                         deltaColor ??
                         (deltaPositive
-                            ? JuselColors.primary
-                            : const Color(0xFFDC2626)),
+                            ? JuselColors.primaryColor(context)
+                            : JuselColors.destructiveColor(context)),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -579,23 +571,23 @@ class _AlertsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const alertColor = Color(0xFFB45309);
+    final alertColor = JuselColors.warningColor(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Alerts',
-          style: JuselTextStyles.headlineMedium.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: JuselTextStyles.headlineMedium(
+            context,
+          ).copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: JuselSpacing.s8),
         lowStockAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text(
             'Failed to load alerts: $e',
-            style: JuselTextStyles.bodySmall.copyWith(
-              color: JuselColors.destructive,
+            style: JuselTextStyles.bodySmall(context).copyWith(
+              color: JuselColors.destructiveColor(context),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -605,15 +597,15 @@ class _AlertsCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(JuselSpacing.s12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: JuselColors.card(context),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: JuselColors.border),
+                  border: Border.all(color: JuselColors.border(context)),
                 ),
                 child: Text(
                   'No low stock alerts.',
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JuselColors.mutedForeground,
+                    color: JuselColors.mutedForeground(context),
                   ),
                 ),
               );
@@ -631,24 +623,25 @@ class _AlertsCard extends StatelessWidget {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => StockDetailScreen(
-                                productId: item.product.id,
-                              ),
+                              builder: (_) =>
+                                  StockDetailScreen(productId: item.product.id),
                             ),
                           ),
                           child: Container(
                             padding: const EdgeInsets.all(JuselSpacing.s16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF4D6),
+                              color: alertColor.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFFFDE68A),
+                                color: alertColor.withOpacity(0.3),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.warning_amber_rounded,
-                                    color: alertColor),
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: alertColor,
+                                ),
                                 const SizedBox(width: JuselSpacing.s12),
                                 Expanded(
                                   child: Column(
@@ -657,25 +650,25 @@ class _AlertsCard extends StatelessWidget {
                                     children: [
                                       Text(
                                         'Low stock: ${item.product.name}',
-                                        style: JuselTextStyles.bodyMedium
-                                            .copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: alertColor,
-                                        ),
+                                        style:
+                                            JuselTextStyles.bodyMedium(
+                                              context,
+                                            ).copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: alertColor,
+                                            ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'Only ${item.stock} units remaining. Restock advised.',
-                                        style: JuselTextStyles.bodySmall
-                                            .copyWith(
-                                          color: alertColor,
-                                        ),
+                                        style: JuselTextStyles.bodySmall(
+                                          context,
+                                        ).copyWith(color: alertColor),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right,
-                                    color: alertColor),
+                                Icon(Icons.chevron_right, color: alertColor),
                               ],
                             ),
                           ),
@@ -701,10 +694,10 @@ class _TrendCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(JuselSpacing.s16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: JuselColors.border.withValues(alpha: 0.9),
+          color: JuselColors.border(context).withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),
@@ -716,15 +709,15 @@ class _TrendCard extends StatelessWidget {
             children: [
               Text(
                 'Sales Trend',
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w700,
-                  color: JuselColors.foreground,
+                  color: JuselColors.foreground(context),
                 ),
               ),
               Text(
                 'Last 7 days',
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -734,7 +727,12 @@ class _TrendCard extends StatelessWidget {
           SizedBox(
             height: 180,
             width: double.infinity,
-            child: CustomPaint(painter: _SalesTrendPainter(values: values)),
+            child: CustomPaint(
+              painter: _SalesTrendPainter(
+                values: values,
+                primaryColor: JuselColors.primaryColor(context),
+              ),
+            ),
           ),
         ],
       ),
@@ -744,16 +742,17 @@ class _TrendCard extends StatelessWidget {
 
 class _SalesTrendPainter extends CustomPainter {
   final List<double> values;
-  _SalesTrendPainter({required this.values});
+  final Color primaryColor;
+  _SalesTrendPainter({required this.values, required this.primaryColor});
 
   @override
   void paint(Canvas canvas, Size size) {
     final bgPaint = Paint()
-      ..color = JuselColors.primary.withValues(alpha: 0.08)
+      ..color = primaryColor.withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
 
     final linePaint = Paint()
-      ..color = JuselColors.primary
+      ..color = primaryColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
@@ -814,18 +813,18 @@ class _TopProductsCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(JuselSpacing.s16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: JuselColors.card(context),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: JuselColors.border.withValues(alpha: 0.9),
+            color: JuselColors.border(context).withValues(alpha: 0.9),
             width: 0.5,
           ),
         ),
         child: Text(
           'Top Products',
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: FontWeight.w700,
-            color: JuselColors.foreground,
+            color: JuselColors.foreground(context),
           ),
         ),
       );
@@ -843,8 +842,8 @@ class _TopProductsCard extends StatelessWidget {
             value: _formatCurrency(entry.value.revenue),
             progress: maxRevenue == 0 ? 0 : entry.value.revenue / maxRevenue,
             color: entry.key == 2
-                ? const Color(0xFF14B8A6)
-                : const Color(0xFF2563EB),
+                ? JuselColors.accentColor(context)
+                : JuselColors.primaryColor(context),
           ),
         )
         .toList();
@@ -852,10 +851,10 @@ class _TopProductsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(JuselSpacing.s16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: JuselColors.border.withValues(alpha: 0.9),
+          color: JuselColors.border(context).withValues(alpha: 0.9),
           width: 0.5,
         ),
       ),
@@ -864,9 +863,9 @@ class _TopProductsCard extends StatelessWidget {
         children: [
           Text(
             'Top Products',
-            style: JuselTextStyles.bodyMedium.copyWith(
+            style: JuselTextStyles.bodyMedium(context).copyWith(
               fontWeight: FontWeight.w700,
-              color: JuselColors.foreground,
+              color: JuselColors.foreground(context),
             ),
           ),
           const SizedBox(height: JuselSpacing.s12),
@@ -910,16 +909,16 @@ class _TopProductRow extends StatelessWidget {
           children: [
             Text(
               item.name,
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w600,
-                color: JuselColors.foreground,
+                color: JuselColors.foreground(context),
               ),
             ),
             Text(
               item.value,
-              style: JuselTextStyles.bodyMedium.copyWith(
+              style: JuselTextStyles.bodyMedium(context).copyWith(
                 fontWeight: FontWeight.w600,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           ],
@@ -930,7 +929,7 @@ class _TopProductRow extends StatelessWidget {
           child: LinearProgressIndicator(
             minHeight: 8,
             value: item.progress,
-            backgroundColor: JuselColors.muted,
+            backgroundColor: JuselColors.muted(context),
             valueColor: AlwaysStoppedAnimation<Color>(item.color),
           ),
         ),

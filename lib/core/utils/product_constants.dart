@@ -5,64 +5,61 @@ class ProductCategories {
   static const String snack = 'snack';
   static const String drink = 'drink';
   static const String water = 'water';
-  static const String bakery = 'bakery';
 
   // Display names (for UI)
   static const Map<String, String> displayNames = {
     snack: 'Snacks',
     drink: 'Drinks',
     water: 'Water',
-    bakery: 'Bakery',
   };
 
   // All categories for UI
-  static const List<String> all = [snack, drink, water, bakery];
+  static const List<String> all = [drink, water, snack];
 
   // Subcategories by category
   static const Map<String, List<String>> subcategories = {
     drink: [
-      ProductSubcategories.softDrink,
-      ProductSubcategories.localDrink,
-      ProductSubcategories.juice,
+      ProductSubcategories.locallyMade,
+      ProductSubcategories.purchased,
     ],
     snack: [
-      ProductSubcategories.chips,
-      ProductSubcategories.biscuits,
-      ProductSubcategories.candy,
-    ],
-    water: [],
-    bakery: [
-      ProductSubcategories.bread,
+      ProductSubcategories.pie,
+      ProductSubcategories.cake,
       ProductSubcategories.pastries,
-      ProductSubcategories.cakes,
+      ProductSubcategories.springRolls,
+      ProductSubcategories.samosas,
+    ],
+    water: [
+      ProductSubcategories.sachetWater,
+      ProductSubcategories.bottle,
     ],
   };
 
   // Display names for subcategories
   static const Map<String, String> subcategoryDisplayNames = {
-    ProductSubcategories.softDrink: 'Soft Drink',
-    ProductSubcategories.localDrink: 'Local Drink',
-    ProductSubcategories.juice: 'Juice',
-    ProductSubcategories.chips: 'Chips',
-    ProductSubcategories.biscuits: 'Biscuits',
-    ProductSubcategories.candy: 'Candy',
-    ProductSubcategories.bread: 'Bread',
+    ProductSubcategories.sachetWater: 'Sachet Water',
+    ProductSubcategories.bottle: 'Bottle',
+    ProductSubcategories.locallyMade: 'Locally Made',
+    ProductSubcategories.purchased: 'Purchased',
+    ProductSubcategories.pie: 'Pie',
+    ProductSubcategories.cake: 'Cake',
     ProductSubcategories.pastries: 'Pastries',
-    ProductSubcategories.cakes: 'Cakes',
+    ProductSubcategories.springRolls: 'Spring Rolls',
+    ProductSubcategories.samosas: 'Samosas',
   };
 }
 
 class ProductSubcategories {
   // Canonical subcategory values (lowercase, with underscores)
-  static const String softDrink = 'soft_drink';
-  static const String localDrink = 'local_drink';
-  static const String juice = 'juice';
-  static const String chips = 'chips';
-  static const String biscuits = 'biscuits';
-  static const String candy = 'candy';
-  static const String bread = 'bread';
+  static const String sachetWater = 'sachet_water';
+  static const String bottle = 'bottle';
+  static const String locallyMade = 'locally_made';
+  static const String purchased = 'purchased';
+  static const String pie = 'pie';
+  static const String cake = 'cake';
   static const String pastries = 'pastries';
-  static const String cakes = 'cakes';
+  static const String springRolls = 'spring_rolls';
+  static const String samosas = 'samosas';
 }
 
 /// Product status values
@@ -75,21 +72,22 @@ class ProductStatus {
 /// Helper functions for product categorization
 class ProductHelpers {
   /// Determine if a product is produced based on category/subcategory
-  /// Produced = locally made snacks / local drinks (juices)
+  /// Produced = snacks + locally made drinks; water is always purchased
   static bool isProduced({
     required String category,
     String? subcategory,
   }) {
-    // Local drinks (juices) are produced
-    if (category == ProductCategories.drink &&
-        (subcategory == ProductSubcategories.juice ||
-            subcategory == ProductSubcategories.localDrink)) {
-      return true;
+    if (category == ProductCategories.water) {
+      return false;
     }
 
-    // Locally made snacks are produced (for now, we'll need business logic to determine this)
-    // For now, assume snacks are purchased unless explicitly marked
-    // This can be enhanced with a UI toggle or business rules
+    if (category == ProductCategories.drink) {
+      return subcategory == ProductSubcategories.locallyMade;
+    }
+
+    if (category == ProductCategories.snack) {
+      return true;
+    }
 
     return false;
   }

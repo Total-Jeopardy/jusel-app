@@ -72,7 +72,7 @@ class _FirstSetupScreenState extends ConsumerState<FirstSetupScreen> {
         authState.whenOrNull(error: (e, st) => e.toString());
 
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       appBar: const JuselAppBar(
         title: 'Create account',
         automaticallyImplyLeading: false,
@@ -108,15 +108,15 @@ class _FirstSetupScreenState extends ConsumerState<FirstSetupScreen> {
                               initialExists
                                   ? 'Create a new account'
                                   : 'Create the first account',
-                              style: JuselTextStyles.headlineMedium,
+                              style: JuselTextStyles.headlineMedium(context),
                             ),
                             const SizedBox(height: JuselSpacing.s12),
                             Text(
                               initialExists
                                   ? 'Forgot password? Create another account and continue.'
                                   : 'This runs only once. Choose a role (boss or apprentice).',
-                              style: JuselTextStyles.bodyMedium.copyWith(
-                                color: JuselColors.mutedForeground,
+                              style: JuselTextStyles.bodyMedium(context).copyWith(
+                                color: JuselColors.mutedForeground(context),
                               ),
                             ),
                             const SizedBox(height: JuselSpacing.s24),
@@ -178,17 +178,17 @@ class _FirstSetupScreenState extends ConsumerState<FirstSetupScreen> {
                               const SizedBox(height: JuselSpacing.s16),
                               Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.error_outline,
                                     size: 16,
-                                    color: JuselColors.destructive,
+                                    color: JuselColors.destructiveColor(context),
                                   ),
                                   const SizedBox(width: JuselSpacing.s8),
                                   Expanded(
                                     child: Text(
                                       errorMessage,
-                                      style: JuselTextStyles.bodySmall.copyWith(
-                                        color: JuselColors.destructive,
+                                      style: JuselTextStyles.bodySmall(context).copyWith(
+                                        color: JuselColors.destructiveColor(context),
                                       ),
                                     ),
                                   ),

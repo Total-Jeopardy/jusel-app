@@ -12,6 +12,7 @@ import 'package:jusel_app/features/account/view/notifications_settings_screen.da
 import 'package:jusel_app/features/account/view/app_theme_screen.dart';
 import 'package:jusel_app/features/account/view/sync_status_screen.dart';
 import 'package:jusel_app/features/account/view/about_jusel_screen.dart';
+import 'package:jusel_app/data/models/app_user.dart';
 import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:jusel_app/features/auth/view/login_screen.dart';
 
@@ -27,6 +28,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authViewModelProvider).valueOrNull;
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -35,7 +37,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: JuselColors.background,
+        backgroundColor: JuselColors.background(context),
         appBar: AppBar(
           elevation: 0,
           leading: IconButton(
@@ -53,14 +55,9 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                Divider(height: 1, color: JuselColors.border(context)),
                 const SizedBox(height: JuselSpacing.s16),
-                const _ProfileHeader(
-                  name: 'Jane Boss',
-                  role: 'BOSS',
-                  phone: '+1 234 567 890',
-                  email: 'jane@jusel.store',
-                ),
+                _ProfileHeader(user: user),
                 const SizedBox(height: JuselSpacing.s16),
                 const _SectionList(
                   title: 'Account',
@@ -78,16 +75,16 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ],
                 ),
                 const SizedBox(height: JuselSpacing.s16),
-                const _SectionList(
+                _SectionList(
                   title: 'Business',
                   children: [
-                    _Tile(
+                    const _Tile(
                       icon: Icons.group_outlined,
                       label: 'Manage Users',
                       action: _TileAction.manageUsers,
                     ),
 
-                    _Tile(
+                    const _Tile(
                       icon: Icons.store_mall_directory_outlined,
                       label: 'Shop Settings',
                       action: _TileAction.shopSettings,
@@ -99,7 +96,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                         '< 10 units',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: JuselColors.mutedForeground,
+                          color: JuselColors.mutedForeground(context),
                         ),
                       ),
                       action: _TileAction.lowStockThreshold,
@@ -107,7 +104,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ],
                 ),
                 const SizedBox(height: JuselSpacing.s12),
-                const _SectionList(
+                _SectionList(
                   title: 'App Settings',
                   children: [
                     _Tile(
@@ -117,7 +114,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                         'On',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: JuselColors.mutedForeground,
+                          color: JuselColors.mutedForeground(context),
                         ),
                       ),
                       action: _TileAction.notifications,
@@ -132,13 +129,13 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                             'Light',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: JuselColors.mutedForeground,
+                              color: JuselColors.mutedForeground(context),
                             ),
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Icon(
                             Icons.chevron_right,
-                            color: JuselColors.mutedForeground,
+                            color: JuselColors.mutedForeground(context),
                           ),
                         ],
                       ),
@@ -147,7 +144,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ],
                 ),
                 const SizedBox(height: JuselSpacing.s12),
-                const _SectionList(
+                _SectionList(
                   title: 'System',
                   children: [
                     _Tile(
@@ -159,14 +156,14 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                           Icon(
                             Icons.circle,
                             size: 10,
-                            color: Color(0xFF16A34A),
+                            color: JuselColors.successColor(context),
                           ),
                           SizedBox(width: 6),
                           Text(
                             'Online',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF16A34A),
+                              color: JuselColors.successColor(context),
                             ),
                           ),
                         ],
@@ -178,7 +175,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                       label: 'About Jusel',
                       trailing: Icon(
                         Icons.chevron_right,
-                        color: JuselColors.mutedForeground,
+                        color: JuselColors.mutedForeground(context),
                       ),
                       action: _TileAction.aboutJusel,
                     ),
@@ -211,7 +208,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Logout failed: $e'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -222,20 +219,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  final String name;
-  final String role;
-  final String phone;
-  final String email;
+  final AppUser? user;
 
-  const _ProfileHeader({
-    required this.name,
-    required this.role,
-    required this.phone,
-    required this.email,
-  });
+  const _ProfileHeader({required this.user});
 
   @override
   Widget build(BuildContext context) {
+    final name = user?.name ?? 'User';
+    final role = user?.role.toUpperCase() ?? 'USER';
+    final phone = user?.phone ?? '';
+    final email = user?.email ?? '';
+
     return Column(
       children: [
         const CircleAvatar(
@@ -245,10 +239,9 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: JuselSpacing.s12),
         Text(
           name,
-          style: JuselTextStyles.headlineSmall.copyWith(
-            fontWeight: FontWeight.w900,
-            fontSize: 22,
-          ),
+          style: JuselTextStyles.headlineSmall(
+            context,
+          ).copyWith(fontWeight: FontWeight.w900, fontSize: 22),
         ),
         const SizedBox(height: JuselSpacing.s6),
         Row(
@@ -257,13 +250,13 @@ class _ProfileHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: JuselColors.primary,
+                color: JuselColors.primaryColor(context),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 role,
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.background,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.background(context),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -271,8 +264,8 @@ class _ProfileHeader extends StatelessWidget {
             const SizedBox(width: JuselSpacing.s8),
             Text(
               phone,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
               ),
@@ -282,8 +275,8 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: JuselSpacing.s6),
         Text(
           email,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
@@ -305,8 +298,8 @@ class _SectionList extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
             fontSize: 14,
           ),
@@ -314,9 +307,9 @@ class _SectionList extends StatelessWidget {
         const SizedBox(height: JuselSpacing.s8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: JuselColors.card(context),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: JuselColors.border(context)),
           ),
           padding: const EdgeInsets.symmetric(
             horizontal: JuselSpacing.s12,
@@ -329,9 +322,9 @@ class _SectionList extends StatelessWidget {
                 children: [
                   entry.value,
                   if (!isLast)
-                    const Divider(
+                    Divider(
                       height: 1,
-                      color: Color(0xFFE5E7EB),
+                      color: JuselColors.border(context),
                       thickness: 1,
                     ),
                 ],
@@ -425,24 +418,24 @@ class _Tile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F7FB),
+                color: JuselColors.muted(context),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: JuselColors.foreground),
+              child: Icon(icon, color: JuselColors.foreground(context)),
             ),
             const SizedBox(width: JuselSpacing.s12),
             Expanded(
               child: Text(
                 label,
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: JuselTextStyles.bodyMedium(
+                  context,
+                ).copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             trailing ??
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
           ],
         ),
@@ -480,17 +473,17 @@ class _FooterButtons extends StatelessWidget {
               context.go('/apprentice-dashboard');
             },
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: JuselColors.muted),
+              side: BorderSide(color: JuselColors.muted(context)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.symmetric(vertical: JuselSpacing.s12),
-              backgroundColor: JuselColors.background,
+              backgroundColor: JuselColors.card(context),
             ),
-            child: const Text(
+            child: Text(
               'Switch to Apprentice View',
               style: TextStyle(
-                color: Color(0xFF2D6BFF),
+                color: JuselColors.primaryColor(context),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -502,28 +495,28 @@ class _FooterButtons extends StatelessWidget {
           child: OutlinedButton(
             onPressed: loggingOut ? null : onLogout,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: JuselColors.destructive),
+              side: BorderSide(color: JuselColors.destructiveColor(context)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.symmetric(vertical: JuselSpacing.s12),
-              backgroundColor: Colors.white,
+              backgroundColor: JuselColors.card(context),
             ),
             child: loggingOut
-                ? const SizedBox(
+                ? SizedBox(
                     height: 18,
                     width: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        JuselColors.destructive,
+                        JuselColors.destructiveColor(context),
                       ),
                     ),
                   )
-                : const Text(
+                : Text(
                     'Log Out',
                     style: TextStyle(
-                      color: JuselColors.destructive,
+                      color: JuselColors.destructiveColor(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -533,9 +526,9 @@ class _FooterButtons extends StatelessWidget {
         Text(
           'Version 1.2.0 (Build 45)\nLast Synced: Just now',
           textAlign: TextAlign.center,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
-          ),
+          style: JuselTextStyles.bodySmall(
+            context,
+          ).copyWith(color: JuselColors.mutedForeground(context)),
         ),
         const SizedBox(height: JuselSpacing.s16),
       ],

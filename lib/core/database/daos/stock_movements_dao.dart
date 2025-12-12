@@ -20,8 +20,10 @@ class StockMovementsDao extends DatabaseAccessor<AppDatabase>
     required String createdByUserId,
     required double unitSellingPrice,
     required double unitCostPrice,
+    String? paymentMethod,
     String? movementId,
     DateTime? createdAt,
+    String? reason,
   }) async {
     final id = movementId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final timestamp = createdAt ?? DateTime.now();
@@ -41,7 +43,8 @@ class StockMovementsDao extends DatabaseAccessor<AppDatabase>
           costPerUnit: Value(unitCostPrice),
           totalCost: Value(totalCost),
           profit: Value(profit),
-          reason: const Value('sale'),
+          paymentMethod: Value(paymentMethod ?? 'cash'),
+          reason: Value(reason ?? 'sale'),
           createdByUserId: createdByUserId,
           createdAt: timestamp,
         ),
@@ -157,11 +160,132 @@ class StockMovementsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// ----------------------------------------------------
+  /// GET MOVEMENTS FOR A USER
+  /// ----------------------------------------------------
+  Future<List<StockMovementsTableData>> getMovementsForUser(String userId) {
+    return (select(stockMovementsTable)
+          ..where((tbl) => tbl.createdByUserId.equals(userId))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
+        .get();
+  }
+
+  /// ----------------------------------------------------
   /// GET ALL MOVEMENTS
   /// ----------------------------------------------------
   Future<List<StockMovementsTableData>> getAllMovements() {
     return (select(
       stockMovementsTable,
     )..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)])).get();
+  }
+
+  /// ----------------------------------------------------
+  /// GET SALES MOVEMENTS BY DATE RANGE
+  /// ----------------------------------------------------
+  Future<List<StockMovementsTableData>> getSalesByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? productId,
+    String? category,
+    String? paymentMethod,
+    String? userId,
+  }) async {
+    // Normalize dates to start/end of day for inclusive range
+    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day);
+    final endOfDay = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    final joins = <Join>[];
+    if (category != null) {
+      joins.add(
+        innerJoin(
+          productsTable,
+          productsTable.id.equalsExp(stockMovementsTable.productId),
+        ),
+      );
+    }
+
+    final query = select(stockMovementsTable).join(joins);
+
+    final predicates = <Expression<bool>>[
+      stockMovementsTable.type.equals('sale'),
+      stockMovementsTable.createdAt.isBiggerOrEqualValue(startOfDay),
+      stockMovementsTable.createdAt.isSmallerOrEqualValue(endOfDay),
+    ];
+
+    if (productId != null) {
+      predicates.add(stockMovementsTable.productId.equals(productId));
+    }
+    if (paymentMethod != null) {
+      predicates.add(stockMovementsTable.paymentMethod.equals(paymentMethod));
+    }
+    if (userId != null) {
+      predicates.add(stockMovementsTable.createdByUserId.equals(userId));
+    }
+    if (category != null) {
+      predicates.add(productsTable.category.equals(category));
+    }
+
+    query.where(predicates.reduce((a, b) => a & b));
+    query.orderBy([OrderingTerm.desc(stockMovementsTable.createdAt)]);
+
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(stockMovementsTable)).toList();
+  }
+
+  /// Get all stock movements (sales, stock_in, production_output, etc.) by date range
+  Future<List<StockMovementsTableData>> getAllMovementsByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? productId,
+    String? category,
+  }) async {
+    // Normalize dates to start/end of day for inclusive range
+    final startOfDay = DateTime(startDate.year, startDate.month, startDate.day);
+    final endOfDay = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    final joins = <Join>[];
+    if (category != null) {
+      joins.add(
+        innerJoin(
+          productsTable,
+          productsTable.id.equalsExp(stockMovementsTable.productId),
+        ),
+      );
+    }
+
+    final query = select(stockMovementsTable).join(joins);
+
+    final predicates = <Expression<bool>>[
+      stockMovementsTable.createdAt.isBiggerOrEqualValue(startOfDay),
+      stockMovementsTable.createdAt.isSmallerOrEqualValue(endOfDay),
+    ];
+
+    if (productId != null) {
+      predicates.add(stockMovementsTable.productId.equals(productId));
+    }
+    if (category != null) {
+      predicates.add(productsTable.category.equals(category));
+    }
+
+    query.where(predicates.reduce((a, b) => a & b));
+    query.orderBy([OrderingTerm.asc(stockMovementsTable.createdAt)]);
+
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(stockMovementsTable)).toList();
   }
 }

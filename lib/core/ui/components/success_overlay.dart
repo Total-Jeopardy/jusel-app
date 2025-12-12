@@ -111,7 +111,7 @@ class _SuccessOverlayState extends State<_SuccessOverlay>
                     Flexible(
                       child: Text(
                         widget.message,
-                        style: JuselTextStyles.bodyMedium.copyWith(
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
                         ),

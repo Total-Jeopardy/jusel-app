@@ -87,18 +87,18 @@ class _NotificationsSettingsScreenState
                           value: _dailySummary,
                           onChanged: (val) =>
                               setState(() => _dailySummary = val),
-                          footer: const Row(
+                          footer: Row(
                             children: [
                               Icon(
                                 Icons.check_circle,
                                 size: 16,
-                                color: Color(0xFF16A34A),
+                                color: JuselColors.successColor(context),
                               ),
-                              SizedBox(width: JuselSpacing.s6),
+                              const SizedBox(width: JuselSpacing.s6),
                               Text(
                                 'Last sent: Today at 8:00 PM',
                                 style: TextStyle(
-                                  color: JuselColors.mutedForeground,
+                                  color: JuselColors.mutedForeground(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -146,10 +146,10 @@ class _NotificationsSettingsScreenState
                     Center(
                       child: TextButton(
                         onPressed: () {},
-                        child: const Text(
+                        child: Text(
                           'Send Test Notification',
                           style: TextStyle(
-                            color: JuselColors.primary,
+                            color: JuselColors.primaryColor(context),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -178,9 +178,11 @@ class _SystemStatusCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F7F1),
+        color: JuselColors.successColor(context).withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFD9F2DD)),
+        border: Border.all(
+          color: JuselColors.successColor(context).withOpacity(0.3),
+        ),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -190,13 +192,13 @@ class _SystemStatusCard extends StatelessWidget {
             Container(
               width: 42,
               height: 42,
-              decoration: const BoxDecoration(
-                color: Color(0xFFDCFCE7),
+              decoration: BoxDecoration(
+                color: JuselColors.successColor(context).withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.notifications_active_outlined,
-                color: Color(0xFF16A34A),
+                color: JuselColors.successColor(context),
               ),
             ),
             const SizedBox(width: JuselSpacing.s12),
@@ -206,16 +208,16 @@ class _SystemStatusCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: JuselTextStyles.bodyMedium.copyWith(
+                    style: JuselTextStyles.bodyMedium(context).copyWith(
                       fontWeight: FontWeight.w700,
-                      color: JuselColors.foreground,
+                      color: JuselColors.foreground(context),
                     ),
                   ),
                   const SizedBox(height: JuselSpacing.s4),
                   Text(
                     subtitle,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -245,8 +247,8 @@ class _Section extends StatelessWidget {
           children: [
             Text(
               title,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 letterSpacing: 0.1,
@@ -255,9 +257,9 @@ class _Section extends StatelessWidget {
             const SizedBox(height: JuselSpacing.s8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: JuselColors.card(context),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(color: JuselColors.border(context)),
               ),
               child: Column(
                 children: children.asMap().entries.map((entry) {
@@ -266,9 +268,9 @@ class _Section extends StatelessWidget {
                     children: [
                       entry.value,
                       if (!isLast)
-                        const Divider(
+                        Divider(
                           height: 1,
-                          color: Color(0xFFE5E7EB),
+                          color: JuselColors.border(context),
                           thickness: 1,
                         ),
                     ],
@@ -320,9 +322,9 @@ class _ToggleTile extends StatelessWidget {
                       Flexible(
                         child: Text(
                           label,
-                          style: JuselTextStyles.bodyMedium.copyWith(
+                          style: JuselTextStyles.bodyMedium(context).copyWith(
                             fontWeight: FontWeight.w700,
-                            color: JuselColors.foreground,
+                            color: JuselColors.foreground(context),
                           ),
                         ),
                       ),
@@ -336,8 +338,8 @@ class _ToggleTile extends StatelessWidget {
                 Switch(
                   value: value,
                   onChanged: onChanged,
-                  activeThumbColor: Colors.white,
-                  activeTrackColor: JuselColors.primary,
+                  activeThumbColor: JuselColors.primaryForeground,
+                  activeTrackColor: JuselColors.primaryColor(context),
                 ),
               ],
             ),
@@ -345,8 +347,8 @@ class _ToggleTile extends StatelessWidget {
               const SizedBox(height: JuselSpacing.s4),
               Text(
                 description!,
-                style: JuselTextStyles.bodySmall.copyWith(
-                  color: JuselColors.mutedForeground,
+                style: JuselTextStyles.bodySmall(context).copyWith(
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -371,13 +373,13 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F0FF),
+        color: JuselColors.primaryColor(context).withOpacity(0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: JuselColors.primary,
+        style: TextStyle(
+          color: JuselColors.primaryColor(context),
           fontWeight: FontWeight.w700,
           fontSize: 11,
         ),

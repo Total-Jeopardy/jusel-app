@@ -54,7 +54,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
@@ -92,10 +92,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             const SizedBox(height: JuselSpacing.s12),
             TextButton(
               onPressed: () => safePop(context, fallbackRoute: '/boss-dashboard'),
-              child: const Text(
+              child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -109,7 +109,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Divider(height: 1, color: JuselColors.border(context)),
               const SizedBox(height: JuselSpacing.s16),
               _UserCard(
                 name: widget.name,
@@ -143,13 +143,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               const SizedBox(height: JuselSpacing.s12),
               Row(
                 children: [
-                  const Icon(Icons.security,
-                      size: 16, color: JuselColors.mutedForeground),
+                  Icon(Icons.security,
+                      size: 16, color: JuselColors.mutedForeground(context)),
                   const SizedBox(width: 6),
                   Text(
                     'Minimum 6 characters required.',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodySmall(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                     ),
                   ),
                 ],
@@ -166,9 +166,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     final email = widget.email;
     if (email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No email available for this user.'),
-          backgroundColor: JuselColors.destructive,
+        SnackBar(
+          content: const Text('No email available for this user.'),
+          backgroundColor: JuselColors.destructiveColor(context),
         ),
       );
       return;
@@ -182,7 +182,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Reset email sent to $email'),
-          backgroundColor: JuselColors.success,
+          backgroundColor: JuselColors.successColor(context),
         ),
       );
       safePop(context, fallbackRoute: '/boss-dashboard');
@@ -206,7 +206,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: JuselColors.destructive,
+          backgroundColor: JuselColors.destructiveColor(context),
         ),
       );
     } finally {
@@ -240,8 +240,8 @@ class _PasswordField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -254,20 +254,20 @@ class _PasswordField extends StatelessWidget {
             suffixIcon: IconButton(
               icon: Icon(
                 obscure ? Icons.visibility_off : Icons.visibility,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
               onPressed: toggle,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasError ? JuselColors.destructive : JuselColors.border,
+                color: hasError ? JuselColors.destructiveColor(context) : JuselColors.border(context),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasError ? JuselColors.destructive : JuselColors.primary,
+                color: hasError ? JuselColors.destructiveColor(context) : JuselColors.primaryColor(context),
                 width: 1.2,
               ),
             ),
@@ -278,8 +278,8 @@ class _PasswordField extends StatelessWidget {
             padding: const EdgeInsets.only(top: JuselSpacing.s6),
             child: Text(
               errorText!,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.destructive,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.destructiveColor(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -321,15 +321,15 @@ class _UserCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: const Color(0xFFE5ECF9),
+              backgroundColor: JuselColors.muted(context),
               backgroundImage:
                   avatarAsset != null ? AssetImage(avatarAsset!) : null,
               child: avatarAsset == null
                   ? Text(
                       initials ?? _initialsFromName(name),
-                      style: JuselTextStyles.bodyMedium.copyWith(
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
                         fontWeight: FontWeight.w700,
-                        color: JuselColors.foreground,
+                        color: JuselColors.foreground(context),
                       ),
                     )
                   : null,
@@ -340,7 +340,7 @@ class _UserCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: JuselTextStyles.bodyMedium.copyWith(
+                  style: JuselTextStyles.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -353,13 +353,13 @@ class _UserCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F1FF),
+                        color: JuselColors.primaryColor(context).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         _roleLabel,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.primary,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.primaryColor(context),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -367,8 +367,8 @@ class _UserCard extends StatelessWidget {
                     const SizedBox(width: JuselSpacing.s8),
                     Text(
                       phone ?? 'No phone added',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w600,
                         fontStyle: phone == null ? FontStyle.italic : null,
                       ),
@@ -401,23 +401,23 @@ class _InfoBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F0FF),
+        color: JuselColors.primaryColor(context).withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline,
             size: 18,
-            color: JuselColors.primary,
+            color: JuselColors.primaryColor(context),
           ),
           const SizedBox(width: JuselSpacing.s8),
           Expanded(
             child: Text(
               text,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.foreground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.foreground(context),
                 fontWeight: FontWeight.w600,
               ),
             ),

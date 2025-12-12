@@ -21,7 +21,10 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void addItem(CartItem item) {
     final existingIndex = state.items.indexWhere(
-      (i) => i.productId == item.productId && i.effectivePrice == item.effectivePrice,
+      (i) =>
+          i.productId == item.productId &&
+          i.effectivePrice == item.effectivePrice &&
+          i.overrideReason == item.overrideReason,
     );
 
     if (existingIndex >= 0) {
@@ -52,7 +55,6 @@ class CartNotifier extends StateNotifier<CartState> {
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   return CartNotifier();
 });
-
 
 
 

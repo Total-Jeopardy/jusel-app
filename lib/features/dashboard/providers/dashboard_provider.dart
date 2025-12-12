@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/services/inventory_service.dart';
+import 'package:jusel_app/features/dashboard/providers/period_filter_provider.dart';
 
 class TopProductMetric {
   final String name;
@@ -37,15 +38,29 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
   final inventoryService = InventoryService(db);
   final pendingDao = ref.watch(pendingSyncQueueDaoProvider);
 
+  // Get date range from period filter state
+  final filterNotifier = ref.read(periodFilterProvider.notifier);
+  final dateRange = filterNotifier.getDateRange();
+
   // Products cache
   final products = await db.productsDao.getAllProducts();
   final productMap = {for (var p in products) p.id: p};
 
-  // Sales movements (approx revenue using current selling price)
-  final movements = await db.stockMovementsDao.getAllMovements();
-  final salesMovements = movements
-      .where((m) => m.type.toLowerCase() == 'sale')
-      .toList();
+  // Sales movements filtered by date range (inclusive) at the DB level
+  final salesMovements = await db.stockMovementsDao.getSalesByDateRange(
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  );
+  final now = DateTime.now();
+  final trendStart = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(const Duration(days: 6));
+  final trendMovements = await db.stockMovementsDao.getSalesByDateRange(
+    startDate: trendStart,
+    endDate: now,
+  );
 
   double salesTotal = 0;
   double profitTotal = 0;
@@ -54,27 +69,38 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
   for (final m in salesMovements) {
     final product = productMap[m.productId];
     if (product == null) continue;
-    final qty = m.quantityUnits;
-    final revenue = m.totalRevenue ?? (product.currentSellingPrice * qty);
-    final cost = m.totalCost ?? (product.currentCostPrice * qty);
+    final qty = m.quantityUnits.toDouble();
+    final revenue =
+        m.totalRevenue ??
+        (m.sellingPricePerUnit != null
+            ? m.sellingPricePerUnit! * qty
+            : product.currentSellingPrice * qty);
+    final cost =
+        m.totalCost ??
+        (m.costPerUnit != null
+            ? m.costPerUnit! * qty
+            : (product.currentCostPrice ?? 0) * qty);
     salesTotal += revenue;
     profitTotal += (revenue - cost);
     revenueByProduct[m.productId] =
         (revenueByProduct[m.productId] ?? 0) + revenue;
   }
 
-  // Trend over last 7 days
-  const daysWindow = 7;
-  final now = DateTime.now();
-  final trendBuckets = List<double>.filled(daysWindow, 0);
-  for (final m in salesMovements) {
+  // Trend over the date range (daily breakdown)
+  const trendDays = 7;
+  final trendBuckets = List<double>.filled(trendDays, 0);
+  for (final m in trendMovements) {
     final product = productMap[m.productId];
     if (product == null) continue;
-    final dayDiff = now.difference(m.createdAt).inDays;
-    if (dayDiff >= 0 && dayDiff < daysWindow) {
+    final dayDiff = m.createdAt.difference(trendStart).inDays;
+    if (dayDiff >= 0 && dayDiff < trendDays) {
+      final qty = m.quantityUnits.toDouble();
       final revenue =
-          m.totalRevenue ?? (product.currentSellingPrice * m.quantityUnits);
-      trendBuckets[daysWindow - 1 - dayDiff] += revenue;
+          m.totalRevenue ??
+          (m.sellingPricePerUnit != null
+              ? m.sellingPricePerUnit! * qty
+              : product.currentSellingPrice * qty);
+      trendBuckets[dayDiff] += revenue;
     }
   }
 

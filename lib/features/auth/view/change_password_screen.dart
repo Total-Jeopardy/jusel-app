@@ -45,25 +45,25 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     final pwd = _newController.text;
     if (pwd.isEmpty) return null;
     if (pwd.length < 6) {
-      return ('Too short', JuselColors.destructive);
+      return ('Too short', JuselColors.destructiveColor(context));
     }
     final hasLetters = RegExp(r'[A-Za-z]').hasMatch(pwd);
     final hasNumbers = RegExp(r'[0-9]').hasMatch(pwd);
     final hasSymbols = RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(pwd);
     final score = [hasLetters, hasNumbers, hasSymbols].where((e) => e).length;
     if (score >= 3 && pwd.length >= 10) {
-      return ('Strong password', JuselColors.success);
+      return ('Strong password', JuselColors.successColor(context));
     }
     if (score >= 2) {
-      return ('Good password', const Color(0xFFF59E0B));
+      return ('Good password', JuselColors.warningColor(context));
     }
-    return ('Weak password', JuselColors.destructive);
+    return ('Weak password', JuselColors.destructiveColor(context));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
@@ -94,7 +94,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      valueColor: AlwaysStoppedAnimation<Color>(JuselColors.primaryForeground),
                     ),
                   )
                 : const Text(
@@ -110,7 +110,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Divider(height: 1, color: JuselColors.border(context)),
               const SizedBox(height: JuselSpacing.s16),
               Card(
                 margin: EdgeInsets.zero,
@@ -143,7 +143,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         const SizedBox(height: JuselSpacing.s6),
                         Text(
                           _strength!.$1,
-                          style: JuselTextStyles.bodySmall.copyWith(
+                          style: JuselTextStyles.bodySmall(context).copyWith(
                             color: _strength!.$2,
                             fontWeight: FontWeight.w700,
                           ),
@@ -157,23 +157,23 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         toggle: () =>
                             setState(() => _showConfirm = !_showConfirm),
                         errorText: _isMismatch ? 'Passwords do not match' : null,
-                        borderColor: _isMismatch ? JuselColors.destructive : null,
+                        borderColor: _isMismatch ? JuselColors.destructiveColor(context) : null,
                         onChanged: (_) => setState(() {}),
                       ),
                       if (_isMismatch) ...[
                         const SizedBox(height: JuselSpacing.s12),
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.error_outline,
                               size: 18,
-                              color: JuselColors.destructive,
+                              color: JuselColors.destructiveColor(context),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               'Passwords do not match',
-                              style: JuselTextStyles.bodySmall.copyWith(
-                                color: JuselColors.destructive,
+                              style: JuselTextStyles.bodySmall(context).copyWith(
+                                color: JuselColors.destructiveColor(context),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -184,8 +184,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         const SizedBox(height: JuselSpacing.s12),
                         Text(
                           _error!,
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.destructive,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.destructiveColor(context),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -230,9 +230,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password updated'),
-          backgroundColor: JuselColors.success,
+        SnackBar(
+          content: const Text('Password updated'),
+          backgroundColor: JuselColors.successColor(context),
         ),
       );
       safePop(context, fallbackRoute: '/boss-dashboard');
@@ -256,7 +256,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -266,7 +266,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to update password: $e'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -305,8 +305,8 @@ class _PasswordField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -317,24 +317,24 @@ class _PasswordField extends StatelessWidget {
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF4F7FB),
+            fillColor: JuselColors.muted(context),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: borderColor ?? const Color(0xFFE5E7EB),
+                color: borderColor ?? JuselColors.border(context),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasError ? JuselColors.destructive : JuselColors.primary,
+                color: hasError ? JuselColors.destructiveColor(context) : JuselColors.primaryColor(context),
                 width: 1.2,
               ),
             ),
             suffixIcon: IconButton(
               icon: Icon(
                 obscure ? Icons.visibility_off : Icons.visibility,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
               onPressed: toggle,
             ),
@@ -345,8 +345,8 @@ class _PasswordField extends StatelessWidget {
             padding: const EdgeInsets.only(top: JuselSpacing.s6),
             child: Text(
               helper!,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.mutedForeground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.mutedForeground(context),
               ),
             ),
           ),

@@ -51,16 +51,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final errorMessage = authState.whenOrNull(error: (e, st) => e.toString());
 
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       body: Stack(
         children: [
           // Background gradient / shapes
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFFE9F0FF), Color(0xFFF8FAFF)],
+                colors: Theme.of(context).brightness == Brightness.dark
+                    ? [
+                        JuselColors.background(context).withOpacity(0.8),
+                        JuselColors.background(context),
+                      ]
+                    : [
+                        JuselColors.primaryColor(context).withOpacity(0.08),
+                        JuselColors.background(context),
+                      ],
               ),
             ),
           ),
@@ -71,7 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               width: 220,
               height: 220,
               decoration: BoxDecoration(
-                color: JuselColors.primary.withOpacity(0.12),
+                color: JuselColors.primaryColor(context).withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
             ),
@@ -112,22 +120,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               children: [
                                 Text(
                                   'Jusel',
-                                  style: JuselTextStyles.headlineMedium
+                                  style: JuselTextStyles.headlineMedium(context)
                                       .copyWith(
-                                        color: JuselColors.primary,
+                                        color: JuselColors.primaryColor(context),
                                         fontWeight: FontWeight.w700,
                                       ),
                                 ),
                                 const SizedBox(height: JuselSpacing.s8),
-                                const Text(
+                                Text(
                                   'Welcome back',
-                                  style: JuselTextStyles.headlineLarge,
+                                  style: JuselTextStyles.headlineLarge(context),
                                 ),
                                 const SizedBox(height: JuselSpacing.s6),
                                 Text(
                                   'Sign in to continue managing sales and stock.',
-                                  style: JuselTextStyles.bodyMedium.copyWith(
-                                    color: JuselColors.mutedForeground,
+                                  style: JuselTextStyles.bodyMedium(context).copyWith(
+                                    color: JuselColors.mutedForeground(context),
                                   ),
                                 ),
                               ],
@@ -155,10 +163,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     children: [
                                       Text(
                                         'New here?',
-                                        style: JuselTextStyles.bodyMedium
+                                        style: JuselTextStyles.bodyMedium(context)
                                             .copyWith(
                                               color:
-                                                  JuselColors.mutedForeground,
+                                                  JuselColors.mutedForeground(context),
                                             ),
                                       ),
                                       JuselButton(
@@ -243,8 +251,8 @@ class _LoginForm extends StatelessWidget {
           ),
           child: Text(
             'Minimum 6 characters.',
-            style: JuselTextStyles.bodySmall.copyWith(
-              color: JuselColors.mutedForeground,
+            style: JuselTextStyles.bodySmall(context).copyWith(
+              color: JuselColors.mutedForeground(context),
             ),
           ),
         ),
@@ -252,17 +260,17 @@ class _LoginForm extends StatelessWidget {
           const SizedBox(height: JuselSpacing.s16),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline,
                 size: 16,
-                color: JuselColors.destructive,
+                color: JuselColors.destructiveColor(context),
               ),
               const SizedBox(width: JuselSpacing.s8),
               Expanded(
                 child: Text(
                   errorMessage!,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.destructive,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.destructiveColor(context),
                   ),
                 ),
               ),

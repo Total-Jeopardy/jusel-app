@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/ui/components/success_overlay.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/auth/view/reset_password_screen.dart';
+import 'package:jusel_app/features/account/view/user_activity_screen.dart';
 
 final _usersProvider = FutureProvider.autoDispose<List<UsersTableData>>((
   ref,
@@ -52,8 +54,8 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
               padding: const EdgeInsets.all(JuselSpacing.s16),
               child: Text(
                 'Failed to load users: $e',
-                style: JuselTextStyles.bodyMedium.copyWith(
-                  color: JuselColors.destructive,
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  color: JuselColors.destructiveColor(context),
                   fontWeight: FontWeight.w700,
                 ),
                 textAlign: TextAlign.center,
@@ -99,18 +101,21 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
                           padding: const EdgeInsets.only(top: JuselSpacing.s12),
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(JuselSpacing.s16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: JuselColors.border),
+                          padding: const EdgeInsets.all(JuselSpacing.s16),
+                          decoration: BoxDecoration(
+                            color: JuselColors.card(context),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: JuselColors.border(context),
                             ),
+                          ),
                             child: Text(
                               'No users found.',
-                              style: JuselTextStyles.bodyMedium.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: JuselColors.mutedForeground,
-                              ),
+                              style: JuselTextStyles.bodyMedium(context)
+                                  .copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: JuselColors.mutedForeground(context),
+                                  ),
                             ),
                           ),
                         ),
@@ -124,8 +129,8 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
                   child: Center(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: JuselColors.primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: JuselColors.primaryColor(context),
+                        foregroundColor: JuselColors.primaryForeground,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 22,
                           vertical: JuselSpacing.s16,
@@ -134,7 +139,9 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         elevation: 4,
-                        shadowColor: JuselColors.primary.withOpacity(0.35),
+                        shadowColor: JuselColors.primaryColor(
+                          context,
+                        ).withOpacity(0.35),
                       ),
                       icon: _creatingUser
                           ? const SizedBox(
@@ -142,7 +149,7 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: JuselColors.primaryForeground,
                               ),
                             )
                           : const Icon(Icons.add),
@@ -178,17 +185,16 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
       );
       await dao.updateUser(updated.toCompanion(true));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(user.isActive ? 'User deactivated' : 'User activated'),
-        ),
+      SuccessOverlay.show(
+        context,
+        message: user.isActive ? 'User deactivated' : 'User activated',
       );
       ref.invalidate(_usersProvider);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to update user: $e'),
-          backgroundColor: JuselColors.destructive,
+          backgroundColor: JuselColors.destructiveColor(context),
         ),
       );
     } finally {
@@ -213,15 +219,13 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
     try {
       await _createUserWithoutSwitchingSession(newUser);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('User added successfully')));
+      SuccessOverlay.show(context, message: 'User added successfully');
       ref.invalidate(_usersProvider);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to add user: $e'),
-          backgroundColor: JuselColors.destructive,
+          backgroundColor: JuselColors.destructiveColor(context),
         ),
       );
     } finally {
@@ -284,8 +288,11 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
   }
 
   void _showActivityPlaceholder(UsersTableData user) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Activity for ${user.name} coming soon.')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            UserActivityScreen(userId: user.id, userName: user.name),
+      ),
     );
   }
 
@@ -328,8 +335,8 @@ class _Section extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
             fontSize: 13,
             letterSpacing: 0.1,
@@ -368,8 +375,10 @@ class _UserCard extends StatelessWidget {
     required this.onResetPassword,
   });
 
-  Color _statusColor() {
-    return user.isActive ? const Color(0xFF16A34A) : JuselColors.destructive;
+  Color _statusColor(BuildContext context) {
+    return user.isActive
+        ? JuselColors.successColor(context)
+        : JuselColors.destructiveColor(context);
   }
 
   String _statusText() {
@@ -379,14 +388,14 @@ class _UserCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isInactive = !user.isActive;
-    final statusColor = _statusColor();
+    final statusColor = _statusColor(context);
     final initials = _initials(user.name);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JuselColors.border),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       padding: const EdgeInsets.all(JuselSpacing.s12),
       child: Row(
@@ -403,11 +412,11 @@ class _UserCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         user.name,
-                        style: JuselTextStyles.bodyMedium.copyWith(
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
                           fontWeight: FontWeight.w700,
                           color: isInactive
-                              ? JuselColors.mutedForeground
-                              : JuselColors.foreground,
+                              ? JuselColors.mutedForeground(context)
+                              : JuselColors.foreground(context),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -422,17 +431,17 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: JuselSpacing.s6),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.mail_outline,
                       size: 16,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                     const SizedBox(width: JuselSpacing.s6),
                     Expanded(
                       child: Text(
                         user.email,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -443,17 +452,17 @@ class _UserCard extends StatelessWidget {
                 const SizedBox(height: JuselSpacing.s4),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.phone,
                       size: 16,
-                      color: JuselColors.mutedForeground,
+                      color: JuselColors.mutedForeground(context),
                     ),
                     const SizedBox(width: JuselSpacing.s6),
                     Expanded(
                       child: Text(
                         user.phone,
-                        style: JuselTextStyles.bodySmall.copyWith(
-                          color: JuselColors.mutedForeground,
+                        style: JuselTextStyles.bodySmall(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w600,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -468,7 +477,7 @@ class _UserCard extends StatelessWidget {
                     const SizedBox(width: JuselSpacing.s6),
                     Text(
                       _statusText(),
-                      style: JuselTextStyles.bodySmall.copyWith(
+                      style: JuselTextStyles.bodySmall(context).copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.w700,
                       ),
@@ -536,16 +545,19 @@ class _UserActions extends StatelessWidget {
       },
       itemBuilder: (context) => [
         _menuItem(
+          context,
           value: _UserAction.resetPassword,
           label: 'Reset Password',
           icon: Icons.lock_reset_outlined,
         ),
         _menuItem(
+          context,
           value: _UserAction.viewActivity,
           label: 'View Activity',
           icon: Icons.show_chart_outlined,
         ),
         _menuItem(
+          context,
           value: _UserAction.deactivate,
           label: isInactive ? 'Activate User' : 'Deactivate User',
           icon: isInactive ? Icons.check_circle_outline : Icons.block,
@@ -556,23 +568,27 @@ class _UserActions extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: JuselColors.muted,
+          color: JuselColors.muted(context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: toggling
-            ? const Padding(
-                padding: EdgeInsets.all(10),
+            ? Padding(
+                padding: const EdgeInsets.all(10),
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: JuselColors.mutedForeground,
+                  color: JuselColors.mutedForeground(context),
                 ),
               )
-            : const Icon(Icons.more_horiz, color: JuselColors.mutedForeground),
+            : Icon(
+                Icons.more_horiz,
+                color: JuselColors.mutedForeground(context),
+              ),
       ),
     );
   }
 
-  PopupMenuItem<_UserAction> _menuItem({
+  PopupMenuItem<_UserAction> _menuItem(
+    BuildContext context, {
     required _UserAction value,
     required String label,
     required IconData icon,
@@ -586,16 +602,16 @@ class _UserActions extends StatelessWidget {
             icon,
             size: 20,
             color: isDestructive
-                ? JuselColors.destructive
-                : JuselColors.foreground,
+                ? JuselColors.destructiveColor(context)
+                : JuselColors.foreground(context),
           ),
           const SizedBox(width: JuselSpacing.s8),
           Text(
             label,
             style: TextStyle(
               color: isDestructive
-                  ? JuselColors.destructive
-                  : JuselColors.foreground,
+                  ? JuselColors.destructiveColor(context)
+                  : JuselColors.foreground(context),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -615,13 +631,13 @@ class _UserAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: 26,
       backgroundColor: dimmed
-          ? JuselColors.muted.withOpacity(0.7)
-          : JuselColors.muted,
+          ? JuselColors.muted(context).withOpacity(0.7)
+          : JuselColors.muted(context),
       child: Text(
         initials,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w700,
-          color: JuselColors.mutedForeground,
+          color: JuselColors.mutedForeground(context),
         ),
       ),
     );
@@ -639,14 +655,16 @@ class _RoleChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: dimmed
-            ? JuselColors.muted.withOpacity(0.9)
-            : const Color(0xFFE9F0FF),
+            ? JuselColors.muted(context).withOpacity(0.9)
+            : JuselColors.primaryColor(context).withOpacity(0.12),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: dimmed ? JuselColors.mutedForeground : JuselColors.primary,
+          color: dimmed
+              ? JuselColors.mutedForeground(context)
+              : JuselColors.primaryColor(context),
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
@@ -719,7 +737,7 @@ class _NewUserSheetState extends State<_NewUserSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: JuselColors.mutedForeground.withOpacity(0.3),
+                color: JuselColors.mutedForeground(context).withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -727,9 +745,9 @@ class _NewUserSheetState extends State<_NewUserSheet> {
           const SizedBox(height: JuselSpacing.s12),
           Text(
             'Add User',
-            style: JuselTextStyles.headlineSmall.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: JuselTextStyles.headlineSmall(
+              context,
+            ).copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: JuselSpacing.s12),
           _Field(
@@ -761,9 +779,9 @@ class _NewUserSheetState extends State<_NewUserSheet> {
           const SizedBox(height: JuselSpacing.s12),
           Text(
             'Role',
-            style: JuselTextStyles.bodySmall.copyWith(
+            style: JuselTextStyles.bodySmall(context).copyWith(
               fontWeight: FontWeight.w700,
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
             ),
           ),
           Row(
@@ -850,9 +868,9 @@ class _Field extends StatelessWidget {
       children: [
         Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
+          style: JuselTextStyles.bodySmall(context).copyWith(
             fontWeight: FontWeight.w700,
-            color: JuselColors.mutedForeground,
+            color: JuselColors.mutedForeground(context),
           ),
         ),
         const SizedBox(height: JuselSpacing.s6),
@@ -863,18 +881,18 @@ class _Field extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: JuselColors.card(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: JuselSpacing.s12,
               vertical: JuselSpacing.s12,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: JuselColors.border),
+              borderSide: BorderSide(color: JuselColors.border(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: JuselColors.border),
+              borderSide: BorderSide(color: JuselColors.border(context)),
             ),
           ),
         ),

@@ -40,7 +40,7 @@ class AboutJuselScreen extends StatelessWidget {
                     const SizedBox(height: JuselSpacing.s16),
                     Text(
                       'Jusel',
-                      style: JuselTextStyles.headlineLarge.copyWith(
+                      style: JuselTextStyles.headlineLarge(context).copyWith(
                         fontWeight: FontWeight.w800,
                         fontSize: 30,
                       ),
@@ -49,8 +49,8 @@ class AboutJuselScreen extends StatelessWidget {
                     Text(
                       'Inventory and sales manager for\nsmall shops',
                       textAlign: TextAlign.center,
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w400,
                         fontSize: 18,
                       ),
@@ -62,13 +62,13 @@ class AboutJuselScreen extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: JuselColors.muted(context),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Version 1.2.0 (Build 45)',
                         style: TextStyle(
-                          color: JuselColors.mutedForeground,
+                          color: JuselColors.mutedForeground(context),
                           fontWeight: FontWeight.w500,
                           fontSize: 15,
                         ),
@@ -81,8 +81,8 @@ class AboutJuselScreen extends StatelessWidget {
                       children: [
                         Text(
                           '© 2023 JuiceNa Technologies',
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
                             fontWeight: FontWeight.w500,
                             fontSize: 15,
                           ),
@@ -91,8 +91,8 @@ class AboutJuselScreen extends StatelessWidget {
                         Text(
                           'Powered by Total_Jeopardy from JuiceNa Technologies',
                           textAlign: TextAlign.center,
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground.withOpacity(0.9),
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context).withOpacity(0.9),
                             fontWeight: FontWeight.w400,
                             fontSize: 14,
                           ),
@@ -118,23 +118,26 @@ class _AppIcon extends StatelessWidget {
       height: 120,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1F6BFF), Color(0xFF6A63FF)],
+        gradient: LinearGradient(
+          colors: [
+            JuselColors.primaryColor(context),
+            JuselColors.accentColor(context),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1F6BFF).withOpacity(0.25),
+            color: JuselColors.primaryColor(context).withOpacity(0.25),
             blurRadius: 14,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
           Icons.store_mall_directory_rounded,
-          color: Colors.white,
+          color: JuselColors.foreground(context).withOpacity(0.1),
           size: 60,
         ),
       ),
@@ -154,16 +157,9 @@ class _LinksCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: JuselColors.border(context)),
       ),
       child: Column(
         children: items.asMap().entries.map((entry) {
@@ -171,7 +167,7 @@ class _LinksCard extends StatelessWidget {
           return Column(
             children: [
               entry.value,
-              if (!isLast) const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              if (!isLast) Divider(height: 1, color: JuselColors.border(context)),
             ],
           );
         }).toList(),
@@ -200,13 +196,13 @@ class _LinkItem extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: JuselTextStyles.bodyMedium.copyWith(
+                style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontWeight: FontWeight.w500,
-                  color: JuselColors.foreground,
+                  color: JuselColors.foreground(context),
                 ),
               ),
             ),
-            const Icon(Icons.chevron_right, color: JuselColors.mutedForeground),
+            Icon(Icons.chevron_right, color: JuselColors.mutedForeground(context)),
           ],
         ),
       ),

@@ -81,9 +81,9 @@ class _ChangePasswordPlaceholderScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(JuselSpacing.s16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: JuselColors.card(context),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: JuselColors.border),
+                        border: Border.all(color: JuselColors.border(context)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,15 +103,14 @@ class _ChangePasswordPlaceholderScreenState
                           _PasswordField(
                             controller: _newController,
                             obscureText: _obscureNew,
-                            onToggle: () => setState(
-                              () => _obscureNew = !_obscureNew,
-                            ),
+                            onToggle: () =>
+                                setState(() => _obscureNew = !_obscureNew),
                           ),
                           const SizedBox(height: JuselSpacing.s6),
                           Text(
                             'Password must be at least 6 characters.',
-                            style: JuselTextStyles.bodySmall.copyWith(
-                              color: JuselColors.mutedForeground,
+                            style: JuselTextStyles.bodySmall(context).copyWith(
+                              color: JuselColors.mutedForeground(context),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -130,17 +129,20 @@ class _ChangePasswordPlaceholderScreenState
                             const SizedBox(height: JuselSpacing.s8),
                             Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.error_outline,
                                   size: 18,
-                                  color: JuselColors.destructive,
+                                  color: JuselColors.destructiveColor(context),
                                 ),
                                 const SizedBox(width: JuselSpacing.s6),
                                 Expanded(
                                   child: Text(
                                     _errorText!,
-                                    style:
-                                        const TextStyle(color: JuselColors.destructive),
+                                    style: TextStyle(
+                                      color: JuselColors.destructiveColor(
+                                        context,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -161,8 +163,8 @@ class _ChangePasswordPlaceholderScreenState
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: JuselColors.primary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: JuselColors.primaryColor(context),
+                          foregroundColor: JuselColors.primaryForeground,
                         ),
                         child: const Text(
                           'Update Password',
@@ -207,24 +209,30 @@ class _PasswordField extends StatelessWidget {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: isError ? JuselColors.destructive : JuselColors.border,
+            color: isError
+                ? JuselColors.destructiveColor(context)
+                : JuselColors.border(context),
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: isError ? JuselColors.destructive : JuselColors.primary,
+            color: isError
+                ? JuselColors.destructiveColor(context)
+                : JuselColors.primaryColor(context),
             width: 1.2,
           ),
         ),
         suffixIcon: IconButton(
           icon: Icon(
-            obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            obscureText
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
           onPressed: onToggle,
         ),
         filled: true,
-        fillColor: JuselColors.muted,
+        fillColor: JuselColors.muted(context),
       ),
     );
   }
@@ -238,8 +246,8 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: JuselTextStyles.bodySmall.copyWith(
-        color: JuselColors.mutedForeground,
+      style: JuselTextStyles.bodySmall(context).copyWith(
+        color: JuselColors.mutedForeground(context),
         fontWeight: FontWeight.w600,
         fontSize: 14,
       ),

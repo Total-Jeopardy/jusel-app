@@ -19,12 +19,11 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
     required String name,
     required String category,
     required String? subcategory,
+    String? imageUrl,
     required bool isProduced,
-    required double? currentCostPrice,
     required double sellingPrice,
     required int? unitsPerPack,
     required String createdByUserId,
-    required int initialStock,
     String status = 'active',
   }) async {
     await into(productsTable).insert(
@@ -33,29 +32,15 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         name: name,
         category: category,
         subcategory: Value(subcategory),
+        imageUrl: Value(imageUrl),
         isProduced: isProduced,
-        currentCostPrice: currentCostPrice ?? 0.0,
+        currentCostPrice: const Value.absent(),
         currentSellingPrice: sellingPrice,
         unitsPerPack: Value(unitsPerPack),
         status: Value(status),
         createdAt: DateTime.now(),
       ),
     );
-
-    // Add initial stock movement if not zero
-    if (initialStock != 0) {
-      await into(stockMovementsTable).insert(
-        StockMovementsTableCompanion.insert(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          productId: id,
-          type: 'stock_in',
-          quantityUnits: initialStock,
-          reason: const Value('initial_stock'),
-          createdByUserId: createdByUserId,
-          createdAt: DateTime.now(),
-        ),
-      );
-    }
 
     return id;
   }
@@ -71,6 +56,7 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
     double? newCostPrice,
     double? newSellingPrice,
     String? status,
+    String? imageUrl,
   }) async {
     await (update(productsTable)..where((tbl) => tbl.id.equals(id))).write(
       ProductsTableCompanion(
@@ -79,6 +65,8 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         subcategory: subcategory != null
             ? Value(subcategory)
             : const Value.absent(),
+        imageUrl:
+            imageUrl != null ? Value(imageUrl) : const Value.absent(),
         currentCostPrice: newCostPrice != null
             ? Value(newCostPrice)
             : const Value.absent(),

@@ -32,7 +32,7 @@ class RestockSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
@@ -64,7 +64,7 @@ class RestockSuccessScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: JuselColors.primary,
+                    backgroundColor: JuselColors.primaryColor(context),
                     foregroundColor: JuselColors.primaryForeground,
                     padding: const EdgeInsets.symmetric(
                       vertical: JuselSpacing.s16,
@@ -102,15 +102,15 @@ class RestockSuccessScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    side: const BorderSide(color: JuselColors.border),
-                    foregroundColor: JuselColors.foreground,
-                    backgroundColor: Colors.white,
+                    side: BorderSide(color: JuselColors.border(context)),
+                    foregroundColor: JuselColors.foreground(context),
+                    backgroundColor: JuselColors.card(context),
                   ),
-                  child: const Text(
+                  child: Text(
                     'View Stock Movements',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: JuselColors.foreground,
+                      color: JuselColors.foreground(context),
                     ),
                   ),
                 ),
@@ -169,15 +169,15 @@ class _SummaryCard extends StatelessWidget {
                   children: [
                     Text(
                       productName,
-                      style: JuselTextStyles.bodyMedium.copyWith(
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: JuselSpacing.s4),
                     Text(
                       category,
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -189,7 +189,7 @@ class _SummaryCard extends StatelessWidget {
             _InfoRow(
               label: 'Units Added',
               value: '+$unitsAdded Units',
-              valueColor: JuselColors.success,
+              valueColor: JuselColors.successColor(context),
               isBold: true,
             ),
             const _Divider(),
@@ -265,15 +265,15 @@ class _InfoRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: JuselTextStyles.bodyMedium.copyWith(
-              color: JuselColors.mutedForeground,
+            style: JuselTextStyles.bodyMedium(context).copyWith(
+              color: JuselColors.mutedForeground(context),
               fontWeight: FontWeight.w600,
             ),
           ),
           Text(
             value,
-            style: JuselTextStyles.bodyMedium.copyWith(
-              color: valueColor ?? JuselColors.foreground,
+            style: JuselTextStyles.bodyMedium(context).copyWith(
+              color: valueColor ?? JuselColors.foreground(context),
               fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
@@ -288,11 +288,11 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: JuselSpacing.s4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: JuselSpacing.s4),
       child: Divider(
         height: 1,
-        color: JuselColors.border,
+        color: JuselColors.border(context),
       ),
     );
   }
@@ -309,7 +309,7 @@ class _ProductThumbnail extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: JuselColors.muted,
+        color: JuselColors.muted(context),
         image: imageAsset != null
             ? DecorationImage(
                 image: AssetImage(imageAsset!),
@@ -318,9 +318,9 @@ class _ProductThumbnail extends StatelessWidget {
             : null,
       ),
       child: imageAsset == null
-          ? const Icon(
+          ? Icon(
               Icons.inventory_2_outlined,
-              color: JuselColors.mutedForeground,
+              color: JuselColors.mutedForeground(context),
             )
           : null,
     );

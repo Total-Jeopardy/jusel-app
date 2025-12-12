@@ -64,10 +64,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(height: JuselSpacing.s6),
                     TextButton(
                       onPressed: () {},
-                      child: const Text(
+                      child: Text(
                         'Change Photo',
                         style: TextStyle(
-                          color: JuselColors.primary,
+                          color: JuselColors.primaryColor(context),
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),
@@ -91,8 +91,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          backgroundColor: JuselColors.primary,
-                          foregroundColor: Colors.white,
+                          backgroundColor: JuselColors.primaryColor(context),
+                          foregroundColor: JuselColors.primaryForeground,
                         ),
                         child: const Text(
                           'Save Changes',
@@ -130,7 +130,7 @@ class _ProfilePhoto extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: JuselColors.primary,
+              color: JuselColors.primaryColor(context),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -140,9 +140,9 @@ class _ProfilePhoto extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.camera_alt_outlined,
-              color: Colors.white,
+              color: JuselColors.primaryForeground,
               size: 18,
             ),
           ),
@@ -169,9 +169,9 @@ class _FormCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JuselColors.border),
+        border: Border.all(color: JuselColors.border(context)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x11000000),
@@ -192,11 +192,13 @@ class _FormCard extends StatelessWidget {
               border: InputBorder.none,
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.border),
+                borderSide: BorderSide(color: JuselColors.border(context)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.primary),
+                borderSide: BorderSide(
+                  color: JuselColors.primaryColor(context),
+                ),
               ),
               hintText: 'Enter full name',
             ),
@@ -212,11 +214,13 @@ class _FormCard extends StatelessWidget {
               border: InputBorder.none,
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.border),
+                borderSide: BorderSide(color: JuselColors.border(context)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.primary),
+                borderSide: BorderSide(
+                  color: JuselColors.primaryColor(context),
+                ),
               ),
               hintText: 'Enter full name',
             ),
@@ -231,11 +235,13 @@ class _FormCard extends StatelessWidget {
               border: InputBorder.none,
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.border),
+                borderSide: BorderSide(color: JuselColors.border(context)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(color: JuselColors.primary),
+                borderSide: BorderSide(
+                  color: JuselColors.primaryColor(context),
+                ),
               ),
               hintText: 'Enter full name',
             ),
@@ -251,7 +257,7 @@ class _FormCard extends StatelessWidget {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: JuselColors.success,
+                  color: JuselColors.successColor(context),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Row(
@@ -259,12 +265,12 @@ class _FormCard extends StatelessWidget {
                     Text(
                       'BOSS',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: JuselColors.primaryForeground,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     SizedBox(width: 6),
-                    Icon(Icons.verified, size: 18, color: Colors.white),
+                    Icon(Icons.verified, size: 18, color: JuselColors.primaryForeground),
                   ],
                 ),
               ),
@@ -285,8 +291,8 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: JuselTextStyles.bodySmall.copyWith(
-        color: JuselColors.mutedForeground,
+      style: JuselTextStyles.bodySmall(context).copyWith(
+        color: JuselColors.mutedForeground(context),
         fontWeight: FontWeight.w600,
         fontSize: 14,
       ),

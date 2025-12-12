@@ -12,6 +12,10 @@ dependencies:
   drift: ^2.29.0
   drift_flutter: ^0.2.7
   path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
+  image_picker: ^1.0.7
+  firebase_storage: ^13.0.4
+  permission_handler: ^11.3.1
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
   cloud_firestore: ^6.1.0
@@ -20,6 +24,9 @@ dependencies:
   go_router: ^14.6.2
   share_plus: ^7.2.1
   printing: ^5.13.4
+  collection: ^1.18.0
+  file_picker: ^8.1.4
+  crypto: ^3.0.5
   # third-party packages removed per request
 
 dev_dependencies:

@@ -79,4 +79,9 @@ class ProductPriceHistoryDao extends DatabaseAccessor<AppDatabase>
           ..orderBy([(tbl) => OrderingTerm.desc(tbl.createdAt)]))
         .get();
   }
+
+  /// Get all price history (for backup)
+  Future<List<ProductPriceHistoryTableData>> getAllHistory() {
+    return select(productPriceHistoryTable).get();
+  }
 }

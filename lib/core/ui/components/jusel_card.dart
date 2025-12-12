@@ -8,6 +8,7 @@ class JuselCard extends StatelessWidget {
   final JuselCardPadding padding;
   final Color? backgroundColor;
   final EdgeInsets? customPadding;
+  final bool elevated;
 
   const JuselCard({
     super.key,
@@ -15,17 +16,36 @@ class JuselCard extends StatelessWidget {
     this.padding = JuselCardPadding.md,
     this.backgroundColor,
     this.customPadding,
+    this.elevated = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Card(
-      color: backgroundColor ?? JuselColors.card,
-      elevation: 1,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(JuselRadii.large),
+      color: backgroundColor ?? 
+        (elevated && isDark 
+          ? JuselColors.cardElevated(context)
+          : JuselColors.card(context)),
+      elevation: isDark ? 0 : 1,
+      shadowColor: isDark 
+        ? Colors.transparent 
+        : Colors.black.withOpacity(0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(JuselRadii.large),
+        side: isDark && !elevated
+          ? BorderSide(
+              color: JuselColors.border(context).withOpacity(0.3),
+              width: 1,
+            )
+          : BorderSide.none,
       ),
-      child: Padding(padding: customPadding ?? _getPadding(), child: child),
+      child: Padding(
+        padding: customPadding ?? _getPadding(),
+        child: child,
+      ),
     );
   }
 

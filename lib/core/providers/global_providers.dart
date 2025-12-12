@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jusel_app/core/services/inventory_service.dart';
 import 'package:jusel_app/core/services/metrics_service.dart';
+import 'package:jusel_app/core/services/periodic_sync_service.dart';
 import 'package:jusel_app/core/services/restock_service.dart';
 import 'package:jusel_app/core/services/sales_service.dart';
+import 'package:jusel_app/core/services/settings_service.dart';
 import 'package:jusel_app/core/sync/sync_orchestrator.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
@@ -61,7 +65,11 @@ final salesServiceProvider = Provider<SalesService>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final inventory = ref.watch(inventoryServiceProvider);
   final syncDao = ref.watch(pendingSyncQueueDaoProvider);
-  return SalesService(db: db, inventoryService: inventory, syncQueueDao: syncDao);
+  return SalesService(
+    db: db,
+    inventoryService: inventory,
+    syncQueueDao: syncDao,
+  );
 });
 
 final restockServiceProvider = Provider<RestockService>((ref) {
@@ -70,3 +78,70 @@ final restockServiceProvider = Provider<RestockService>((ref) {
   return RestockService(db, syncDao);
 });
 
+/// SharedPreferences provider
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
+  ref,
+) async {
+  return SharedPreferences.getInstance();
+});
+
+/// SettingsService provider
+final settingsServiceProvider = FutureProvider<SettingsService>((ref) async {
+  final prefs = await ref.watch(sharedPreferencesProvider.future);
+  return SettingsService(prefs);
+});
+
+/// Connectivity provider - checks if device is online
+final connectivityProvider = StreamProvider.autoDispose<bool>((ref) {
+  final controller = StreamController<bool>.broadcast();
+  Timer? timer;
+
+  controller.add(true); // Assume online initially
+
+  Future.microtask(() async {
+    await Future.delayed(const Duration(milliseconds: 1000)); // Delay check
+    final syncOrchestrator = ref.read(syncOrchestratorProvider);
+
+    timer = Timer.periodic(const Duration(seconds: 3), (t) async {
+      if (controller.isClosed) {
+        t.cancel();
+        return;
+      }
+      try {
+        final isOnline = await syncOrchestrator.isOnline();
+        if (!controller.isClosed) {
+          controller.add(isOnline);
+        }
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller.add(false);
+        }
+      }
+    });
+  });
+
+  ref.onDispose(() {
+    timer?.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+/// Periodic sync service provider
+final periodicSyncServiceProvider = Provider<PeriodicSyncService>((ref) {
+  final service = PeriodicSyncService(ref);
+
+  // Auto-start when provider is created (after first frame to avoid blocking)
+  // Use a delayed future to ensure it doesn't block app startup
+  Future.delayed(const Duration(milliseconds: 500), () {
+    service.start();
+  });
+
+  // Clean up when provider is disposed
+  ref.onDispose(() {
+    service.dispose();
+  });
+
+  return service;
+});

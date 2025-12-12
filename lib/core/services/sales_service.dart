@@ -44,7 +44,9 @@ class SalesService {
     required String productId,
     required int quantity,
     required String createdByUserId,
+    String? paymentMethod,
     double? overriddenPrice,
+    String? priceOverrideReason,
   }) async {
     if (quantity <= 0) {
       throw Exception('Quantity must be greater than zero');
@@ -68,7 +70,7 @@ class SalesService {
     final unitCostPrice = product.currentCostPrice;
 
     final totalRevenue = unitSellingPrice * quantity;
-    final totalCost = unitCostPrice * quantity;
+    final totalCost = unitCostPrice! * quantity;
     final profit = totalRevenue - totalCost;
 
     final movementId = await db.stockMovementsDao.recordSale(
@@ -77,6 +79,8 @@ class SalesService {
       createdByUserId: createdByUserId,
       unitSellingPrice: unitSellingPrice,
       unitCostPrice: unitCostPrice,
+      paymentMethod: paymentMethod ?? 'cash',
+      reason: priceOverrideReason,
     );
 
     final payload = {
@@ -88,8 +92,10 @@ class SalesService {
       'totalRevenue': totalRevenue,
       'totalCost': totalCost,
       'profit': profit,
+      'paymentMethod': paymentMethod ?? 'cash',
       'createdByUserId': createdByUserId,
       'createdAt': DateTime.now().toIso8601String(),
+      'priceOverrideReason': priceOverrideReason,
     };
 
     await syncQueueDao.enqueueOperation(

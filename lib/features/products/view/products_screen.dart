@@ -5,8 +5,10 @@ import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/utils/product_constants.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
+import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 import 'package:jusel_app/features/products/view/add_product_screen.dart';
+import 'package:jusel_app/features/products/providers/products_provider.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
@@ -23,6 +25,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   List<_Product> _products = const [];
   bool _loading = true;
   String? _error;
+  int? _lastRefreshTrigger;
 
   @override
   void initState() {
@@ -50,7 +53,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           subcategory: p.subcategory,
           isProduced: p.isProduced,
           price: p.currentSellingPrice,
-          cost: p.currentCostPrice,
+          cost: p.currentCostPrice ?? 0,
           status: status,
           statusCount: stock,
         );
@@ -75,12 +78,40 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch for refresh trigger
+    final refreshTrigger = ref.watch(productsRefreshTriggerProvider);
+    if (_lastRefreshTrigger != null &&
+        refreshTrigger != _lastRefreshTrigger &&
+        refreshTrigger > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadProducts(); // Reload products when trigger changes
+      });
+    }
+    _lastRefreshTrigger = refreshTrigger;
+
     final filtered = _applyFilters(_products);
 
-    return Scaffold(
-      backgroundColor: JuselColors.background,
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            ref.read(dashboardTabProvider.notifier).goToDashboard();
+          }
+        }
+      },
+      child: Scaffold(
+      backgroundColor: JuselColors.background(context),
       appBar: AppBar(
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            ref.read(dashboardTabProvider.notifier).goToDashboard();
+          },
+        ),
         title: const Text(
           'Products',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -89,24 +120,20 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: JuselSpacing.s12),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: const Color(0xFFE5ECF9),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AccountScreen()),
-                  );
-                },
-                child: Center(
-                  child: Text(
-                    'JD',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: JuselColors.foreground,
-                    ),
-                  ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(25),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AccountScreen()),
+                );
+              },
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: JuselColors.muted(context),
+                child: Icon(
+                  Icons.person,
+                  size: 20,
+                  color: JuselColors.mutedForeground(context),
                 ),
               ),
             ),
@@ -115,15 +142,15 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.of(
-            context,
-          ).push<bool>(MaterialPageRoute(builder: (_) => const AddProductScreen()));
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const AddProductScreen()),
+          );
           // Refresh products list if a product was successfully added
           if (result == true) {
             _loadProducts();
           }
         },
-        backgroundColor: JuselColors.primary,
+        backgroundColor: JuselColors.primaryColor(context),
         child: const Icon(Icons.add),
       ),
       body: SafeArea(
@@ -132,7 +159,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Divider(height: 1, color: JuselColors.border(context)),
               const SizedBox(height: JuselSpacing.s16),
               _SearchBar(
                 controller: _searchController,
@@ -151,8 +178,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   padding: const EdgeInsets.all(JuselSpacing.s12),
                   child: Text(
                     _error!,
-                    style: JuselTextStyles.bodyMedium.copyWith(
-                      color: JuselColors.destructive,
+                    style: JuselTextStyles.bodyMedium(context).copyWith(
+                      color: JuselColors.destructiveColor(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -162,8 +189,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   padding: const EdgeInsets.all(JuselSpacing.s12),
                   child: Text(
                     'No products found.',
-                    style: JuselTextStyles.bodyMedium.copyWith(
-                      color: JuselColors.mutedForeground,
+                    style: JuselTextStyles.bodyMedium(context).copyWith(
+                      color: JuselColors.mutedForeground(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -180,6 +207,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -200,9 +228,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         ProductFilter.all => true,
         ProductFilter.drinks => p.category == ProductCategories.drink,
         ProductFilter.localDrinks =>
-            p.category == ProductCategories.drink &&
-            (p.subcategory == ProductSubcategories.localDrink ||
-                p.subcategory == ProductSubcategories.juice),
+          p.category == ProductCategories.drink &&
+              p.subcategory == ProductSubcategories.locallyMade,
         ProductFilter.snacks => p.category == ProductCategories.snack,
       };
       return matchesQuery && matchesFilter;
@@ -224,15 +251,18 @@ class _SearchBar extends StatelessWidget {
       decoration: InputDecoration(
         hintText: 'Search products...',
         prefixIcon: const Icon(Icons.search),
-        fillColor: Colors.white,
+        fillColor: JuselColors.muted(context),
         filled: true,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          borderSide: BorderSide(color: JuselColors.border(context)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          borderSide: BorderSide(
+            color: JuselColors.primaryColor(context),
+            width: 1.2,
+          ),
         ),
       ),
     );
@@ -247,10 +277,15 @@ class _FilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final drinkLabel = ProductHelpers.categoryToDisplay(ProductCategories.drink);
-    final snackLabel = ProductHelpers.categoryToDisplay(ProductCategories.snack);
-    final localDrinkLabel =
-        ProductHelpers.subcategoryToDisplay(ProductSubcategories.localDrink);
+    final drinkLabel = ProductHelpers.categoryToDisplay(
+      ProductCategories.drink,
+    );
+    final snackLabel = ProductHelpers.categoryToDisplay(
+      ProductCategories.snack,
+    );
+    final locallyMadeLabel = ProductHelpers.subcategoryToDisplay(
+      ProductSubcategories.locallyMade,
+    );
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -267,7 +302,7 @@ class _FilterChips extends StatelessWidget {
                     onTap: () => onSelected(ProductFilter.drinks),
                   ),
                   _Chip(
-                    label: localDrinkLabel,
+                    label: locallyMadeLabel,
                     active: selected == ProductFilter.localDrinks,
                     onTap: () => onSelected(ProductFilter.localDrinks),
                   ),
@@ -304,16 +339,16 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? JuselColors.foreground : Colors.white,
+          color: active ? JuselColors.foreground(context) : JuselColors.card(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: active ? Colors.transparent : const Color(0xFFE5E7EB),
+            color: active ? Colors.transparent : JuselColors.border(context),
           ),
         ),
         child: Text(
           label,
-          style: JuselTextStyles.bodySmall.copyWith(
-            color: active ? Colors.white : JuselColors.mutedForeground,
+          style: JuselTextStyles.bodySmall(context).copyWith(
+            color: active ? JuselColors.background(context) : JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -329,15 +364,16 @@ class _ProductTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _statusStyle(product.status, product.statusCount);
+    final status = _statusStyle(context, product.status, product.statusCount);
     final categoryLabel = ProductHelpers.categoryToDisplay(product.category);
     final subcategoryLabel = product.subcategory != null
         ? ProductHelpers.subcategoryToDisplay(product.subcategory!)
         : null;
-    final categoryDisplay =
-        subcategoryLabel != null ? '$categoryLabel · $subcategoryLabel' : categoryLabel;
+    final categoryDisplay = subcategoryLabel != null
+        ? '$categoryLabel · $subcategoryLabel'
+        : categoryLabel;
     return Material(
-      color: Colors.white,
+      color: JuselColors.card(context),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -360,7 +396,7 @@ class _ProductTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+            border: Border.all(color: JuselColors.border(context)),
           ),
           padding: const EdgeInsets.all(JuselSpacing.s12),
           child: Row(
@@ -378,18 +414,18 @@ class _ProductTile extends StatelessWidget {
                           child: Text(
                             product.name,
                             overflow: TextOverflow.ellipsis,
-                            style: JuselTextStyles.bodyMedium.copyWith(
+                            style: JuselTextStyles.bodyMedium(context).copyWith(
                               fontWeight: FontWeight.w700,
-                              color: JuselColors.foreground,
+                              color: JuselColors.foreground(context),
                             ),
                           ),
                         ),
                         const SizedBox(width: JuselSpacing.s8),
                         Text(
                           'GHS ${product.price.toStringAsFixed(2)}',
-                          style: JuselTextStyles.bodyMedium.copyWith(
+                          style: JuselTextStyles.bodyMedium(context).copyWith(
                             fontWeight: FontWeight.w800,
-                            color: JuselColors.foreground,
+                            color: JuselColors.foreground(context),
                           ),
                         ),
                       ],
@@ -399,8 +435,8 @@ class _ProductTile extends StatelessWidget {
                       children: [
                         Text(
                           categoryDisplay,
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
                           ),
                         ),
                         const SizedBox(width: JuselSpacing.s8),
@@ -414,17 +450,17 @@ class _ProductTile extends StatelessWidget {
                     const SizedBox(height: JuselSpacing.s6),
                     Text(
                       'Cost: GHS ${product.cost.toStringAsFixed(2)}',
-                      style: JuselTextStyles.bodySmall.copyWith(
-                        color: JuselColors.mutedForeground,
+                      style: JuselTextStyles.bodySmall(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: JuselColors.mutedForeground,
+                color: JuselColors.mutedForeground(context),
               ),
             ],
           ),
@@ -433,25 +469,25 @@ class _ProductTile extends StatelessWidget {
     );
   }
 
-  _StatusStyle _statusStyle(ProductStatus status, int count) {
+  _StatusStyle _statusStyle(BuildContext context, ProductStatus status, int count) {
     switch (status) {
       case ProductStatus.good:
         return _StatusStyle(
           label: 'Good ($count)',
-          color: const Color(0xFF16A34A),
-          background: const Color(0xFFE9F8EF),
+          color: JuselColors.successColor(context),
+          background: JuselColors.successColor(context).withOpacity(0.12),
         );
       case ProductStatus.low:
         return _StatusStyle(
           label: 'Low ($count)',
-          color: const Color(0xFFF59E0B),
-          background: const Color(0xFFFFF7E6),
+          color: JuselColors.warningColor(context),
+          background: JuselColors.warningColor(context).withOpacity(0.12),
         );
       case ProductStatus.out:
-        return const _StatusStyle(
+        return _StatusStyle(
           label: 'Out of Stock',
-          color: JuselColors.destructive,
-          background: Color(0xFFFFF1F2),
+          color: JuselColors.destructiveColor(context),
+          background: JuselColors.destructiveColor(context).withOpacity(0.12),
         );
     }
   }
@@ -468,15 +504,15 @@ class _ProductThumb extends StatelessWidget {
       width: 54,
       height: 54,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: JuselColors.muted(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
         child: Text(
           name.characters.take(2).toString(),
-          style: JuselTextStyles.bodyMedium.copyWith(
+          style: JuselTextStyles.bodyMedium(context).copyWith(
             fontWeight: FontWeight.w800,
-            color: JuselColors.foreground,
+            color: JuselColors.foreground(context),
           ),
         ),
       ),
@@ -505,7 +541,7 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: JuselTextStyles.bodySmall.copyWith(
+        style: JuselTextStyles.bodySmall(context).copyWith(
           color: color,
           fontWeight: FontWeight.w700,
         ),

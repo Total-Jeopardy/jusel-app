@@ -7,14 +7,15 @@ import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/sync/sync_orchestrator.dart';
+import 'package:jusel_app/core/ui/components/success_overlay.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 
 final _pendingOpsProvider =
     FutureProvider.autoDispose<List<PendingSyncQueueTableData>>((ref) async {
-  final dao = ref.read(pendingSyncQueueDaoProvider);
-  return dao.getAllPendingOperations();
-});
+      final dao = ref.read(pendingSyncQueueDaoProvider);
+      return dao.getAllPendingOperations();
+    });
 
 class PendingItemsScreen extends ConsumerStatefulWidget {
   const PendingItemsScreen({super.key});
@@ -31,7 +32,7 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
     final pendingAsync = ref.watch(_pendingOpsProvider);
 
     return Scaffold(
-      backgroundColor: JuselColors.background,
+      backgroundColor: JuselColors.background(context),
       appBar: AppBar(
         elevation: 0,
         leading: IconButton(
@@ -46,29 +47,76 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              color: const Color(0xFFFFF4CE),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(right: JuselSpacing.s8),
-                    child: Icon(
-                      Icons.circle,
-                      size: 10,
-                      color: Color(0xFFDAA200),
+            Consumer(
+              builder: (context, ref, _) {
+                final connectivityAsync = ref.watch(connectivityProvider);
+                return connectivityAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => Container(
+                    width: double.infinity,
+                    color: JuselColors.warningColor(context).withOpacity(0.12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            right: JuselSpacing.s8,
+                          ),
+                          child: Icon(
+                            Icons.circle,
+                            size: 10,
+                            color: JuselColors.warningColor(context),
+                          ),
+                        ),
+                        Text(
+                          'Offline Mode',
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: JuselColors.warningColor(context),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    'Offline Mode',
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFFDAA200),
-                    ),
-                  ),
-                ],
-              ),
+                  data: (isOnline) {
+                    if (isOnline) return const SizedBox.shrink();
+                    return Container(
+                      width: double.infinity,
+                      color: JuselColors.warningColor(
+                        context,
+                      ).withOpacity(0.12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: JuselSpacing.s8,
+                            ),
+                            child: Icon(
+                              Icons.circle,
+                              size: 10,
+                              color: JuselColors.warningColor(context),
+                            ),
+                          ),
+                          Text(
+                            'Offline Mode',
+                            style: JuselTextStyles.bodySmall(context).copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: JuselColors.warningColor(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             ),
             Expanded(
               child: pendingAsync.when(
@@ -78,8 +126,8 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
                     padding: const EdgeInsets.all(JuselSpacing.s16),
                     child: Text(
                       'Failed to load pending items: $e',
-                      style: JuselTextStyles.bodyMedium.copyWith(
-                        color: JuselColors.destructive,
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
+                        color: JuselColors.destructiveColor(context),
                         fontWeight: FontWeight.w700,
                       ),
                       textAlign: TextAlign.center,
@@ -99,8 +147,8 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
                         const SizedBox(height: JuselSpacing.s16),
                         Text(
                           'WAITING TO SYNC (${items.length})',
-                          style: JuselTextStyles.bodySmall.copyWith(
-                            color: JuselColors.mutedForeground,
+                          style: JuselTextStyles.bodySmall(context).copyWith(
+                            color: JuselColors.mutedForeground(context),
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.2,
                           ),
@@ -111,16 +159,19 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(JuselSpacing.s12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: JuselColors.card(context),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: JuselColors.border),
+                              border: Border.all(
+                                color: JuselColors.border(context),
+                              ),
                             ),
                             child: Text(
                               'No pending operations.',
-                              style: JuselTextStyles.bodyMedium.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: JuselColors.mutedForeground,
-                              ),
+                              style: JuselTextStyles.bodyMedium(context)
+                                  .copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: JuselColors.mutedForeground(context),
+                                  ),
                             ),
                           )
                         else
@@ -154,8 +205,8 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    backgroundColor: JuselColors.primary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: JuselColors.primaryColor(context),
+                    foregroundColor: JuselColors.primaryForeground,
                   ),
                   icon: _syncing
                       ? const SizedBox(
@@ -163,14 +214,18 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                            valueColor: AlwaysStoppedAnimation(
+                              JuselColors.primaryForeground,
+                            ),
                           ),
                         )
                       : const Icon(Icons.sync),
                   label: Text(
                     _syncing ? 'Syncing...' : 'Sync All Now',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -185,29 +240,58 @@ class _PendingItemsScreenState extends ConsumerState<PendingItemsScreen> {
     setState(() => _syncing = true);
     try {
       final orchestrator = ref.read(syncOrchestratorProvider);
+
+      // Check connectivity before syncing
+      if (!await orchestrator.isOnline()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Device is offline. Please check your connection.',
+              ),
+              backgroundColor: JuselColors.destructiveColor(context),
+            ),
+          );
+        }
+        return;
+      }
+
       final result = await orchestrator.syncAll();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.status == SyncStatus.allSynced
-                ? 'All items synced.'
-                : result.status == SyncStatus.offline
-                    ? 'Device is offline. Try again later.'
-                    : 'Synced: ${result.syncedCount}, Failed: ${result.failedCount}',
+
+      if (result.status == SyncStatus.allSynced) {
+        if (mounted) {
+          SuccessOverlay.show(
+            context,
+            message: 'All items synced successfully!',
+          );
+        }
+      } else if (result.status == SyncStatus.offline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Device is offline. Try again later.'),
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
-          backgroundColor: result.status == SyncStatus.allSynced
-              ? JuselColors.success
-              : JuselColors.destructive,
-        ),
-      );
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Synced: ${result.syncedCount}, Failed: ${result.failedCount}',
+            ),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+
+      // Refresh the pending items list
       ref.invalidate(_pendingOpsProvider);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sync failed: $e'),
-            backgroundColor: JuselColors.destructive,
+            backgroundColor: JuselColors.destructiveColor(context),
           ),
         );
       }
@@ -225,10 +309,12 @@ class _PendingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusLabel = item.status.toUpperCase();
     final isRetrying = item.status == 'retrying';
-    final statusColor =
-        isRetrying ? const Color(0xFFF97316) : JuselColors.mutedForeground;
-    final statusBg =
-        isRetrying ? const Color(0xFFFFF4E7) : const Color(0xFFF1F5F9);
+    final statusColor = isRetrying
+        ? JuselColors.warningColor(context)
+        : JuselColors.mutedForeground(context);
+    final statusBg = isRetrying
+        ? JuselColors.warningColor(context).withOpacity(0.12)
+        : JuselColors.muted(context);
 
     final subtitle =
         '${DateFormat('MMM d, h:mm a').format(item.createdAt)} · ${item.operationType}';
@@ -236,9 +322,9 @@ class _PendingCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: JuselColors.card(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: JuselColors.border),
+        border: Border.all(color: JuselColors.border(context)),
       ),
       padding: const EdgeInsets.all(JuselSpacing.s12),
       child: Row(
@@ -247,10 +333,13 @@ class _PendingCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFE9F0FF),
+              color: JuselColors.primaryColor(context).withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.sync_alt, color: JuselColors.primary),
+            child: Icon(
+              Icons.sync_alt,
+              color: JuselColors.primaryColor(context),
+            ),
           ),
           const SizedBox(width: JuselSpacing.s12),
           Expanded(
@@ -259,15 +348,15 @@ class _PendingCard extends StatelessWidget {
               children: [
                 Text(
                   item.operationType,
-                  style: JuselTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: JuselTextStyles.bodyMedium(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: JuselSpacing.s4),
                 Text(
                   subtitle,
-                  style: JuselTextStyles.bodySmall.copyWith(
-                    color: JuselColors.mutedForeground,
+                  style: JuselTextStyles.bodySmall(context).copyWith(
+                    color: JuselColors.mutedForeground(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -277,9 +366,9 @@ class _PendingCard extends StatelessWidget {
                     payloadPreview,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: JuselTextStyles.bodySmall.copyWith(
-                      color: JuselColors.mutedForeground,
-                    ),
+                    style: JuselTextStyles.bodySmall(
+                      context,
+                    ).copyWith(color: JuselColors.mutedForeground(context)),
                   ),
                 ],
               ],
@@ -297,10 +386,9 @@ class _PendingCard extends StatelessWidget {
             ),
             child: Text(
               statusLabel,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: statusColor,
-                fontWeight: FontWeight.w800,
-              ),
+              style: JuselTextStyles.bodySmall(
+                context,
+              ).copyWith(color: statusColor, fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -310,13 +398,33 @@ class _PendingCard extends StatelessWidget {
 
   String? _previewPayload(String payload) {
     try {
-      final decoded = jsonDecode(payload);
-      if (decoded is Map && decoded.containsKey('productName')) {
-        return 'Product: ${decoded['productName']}';
+      final decoded = jsonDecode(payload) as Map<String, dynamic>;
+
+      // Format based on operation type
+      if (decoded.containsKey('name')) {
+        return 'Product: ${decoded['name']}';
+      } else if (decoded.containsKey('quantity') &&
+          decoded.containsKey('productId')) {
+        final qty = decoded['quantity'];
+        if (decoded.containsKey('unitSellingPrice')) {
+          // Sale
+          final price = decoded['unitSellingPrice'];
+          return 'Qty: $qty @ GHS ${(price as num).toStringAsFixed(2)}';
+        } else if (decoded.containsKey('costPerUnit')) {
+          // Restock
+          final cost = decoded['costPerUnit'];
+          return 'Qty: $qty @ GHS ${(cost as num).toStringAsFixed(2)}/unit';
+        }
       }
-      return payload.length > 80 ? '${payload.substring(0, 80)}...' : payload;
+
+      // Fallback: show product ID if available
+      if (decoded.containsKey('productId')) {
+        return 'Product ID: ${decoded['productId']}';
+      }
+
+      return null; // Don't show preview if we can't format it nicely
     } catch (_) {
-      return payload.length > 80 ? '${payload.substring(0, 80)}...' : payload;
+      return null;
     }
   }
 }
@@ -331,19 +439,23 @@ class _InfoBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(JuselSpacing.s12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F0FF),
+        color: JuselColors.primaryColor(context).withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, size: 18, color: JuselColors.primary),
+          Icon(
+            Icons.info_outline,
+            size: 18,
+            color: JuselColors.primaryColor(context),
+          ),
           const SizedBox(width: JuselSpacing.s8),
           Expanded(
             child: Text(
               text,
-              style: JuselTextStyles.bodySmall.copyWith(
-                color: JuselColors.foreground,
+              style: JuselTextStyles.bodySmall(context).copyWith(
+                color: JuselColors.foreground(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
