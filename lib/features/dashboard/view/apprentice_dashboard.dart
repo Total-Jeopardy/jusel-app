@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/ui/components/profile_avatar.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
 import 'package:jusel_app/features/products/view/products_screen.dart';
 import 'package:jusel_app/features/sales/view/sales_screen.dart';
+import 'package:jusel_app/features/sales/providers/cart_provider.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
+import 'package:jusel_app/features/account/view/account_screen.dart';
 
 final apprenticeLowStockProvider =
     FutureProvider.autoDispose<List<_LowStockItem>>((ref) async {
@@ -46,7 +50,7 @@ class _ApprenticeDashboardState extends ConsumerState<ApprenticeDashboard> {
     super.initState();
     _pages = <Widget>[
       _DashboardHome(onNavigateToTab: _setTab),
-      const ProductsScreen(),
+      const ProductsScreen(showAddButton: false),
       const SalesScreen(),
     ];
   }
@@ -90,12 +94,15 @@ class _DashboardHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lowStockAsync = ref.watch(apprenticeLowStockProvider);
+    final user = ref.watch(authViewModelProvider).valueOrNull;
+    final name = user?.name ?? 'Apprentice';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _Header(name: name),
           const SizedBox(height: JuselSpacing.s16),
           _NewSaleCard(onNavigateToTab),
           const SizedBox(height: JuselSpacing.s16),
@@ -104,6 +111,80 @@ class _DashboardHome extends ConsumerWidget {
           _AlertCard(lowStockAsync: lowStockAsync),
         ],
       ),
+    );
+  }
+}
+
+class _Header extends ConsumerWidget {
+  final String name;
+  const _Header({required this.name});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authViewModelProvider).valueOrNull;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dashboard',
+                style: JuselTextStyles.headlineLarge(context).copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 32,
+                  color: JuselColors.foreground(context),
+                ),
+              ),
+              Text(
+                'Welcome back, $name',
+                style: JuselTextStyles.bodyMedium(context).copyWith(
+                  fontSize: 18,
+                  color: JuselColors.mutedForeground(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: JuselSpacing.s20,
+                vertical: JuselSpacing.s8,
+              ),
+              decoration: BoxDecoration(
+                color: JuselColors.primaryColor(context),
+                borderRadius: BorderRadius.circular(500),
+              ),
+              child: Text(
+                'Apprentice',
+                style: TextStyle(
+                  color: JuselColors.background(context),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: JuselSpacing.s6),
+            InkWell(
+              borderRadius: BorderRadius.circular(25),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AccountScreen()),
+                );
+              },
+              child: ProfileAvatar(
+                radius: 25,
+                userId: user?.uid,
+                userName: name,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -469,199 +550,109 @@ class _NewSaleCard extends StatelessWidget {
 
 
 
-class _SavedSaleCard extends StatelessWidget {
+class _SavedSaleCard extends ConsumerWidget {
   final void Function(int) onNavigateToTab;
 
   const _SavedSaleCard(this.onNavigateToTab);
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    final totalItems =
+        cart.items.fold<int>(0, (sum, item) => sum + item.quantity);
 
-  Widget build(BuildContext context) {
+    if (totalItems == 0) return const SizedBox.shrink();
 
     return Container(
-
       width: double.infinity,
-
       padding: const EdgeInsets.all(JuselSpacing.s12),
-
       decoration: BoxDecoration(
-
         color: JuselColors.card(context),
-
         borderRadius: BorderRadius.circular(16),
-
         border: Border.all(color: JuselColors.border(context)),
-
         boxShadow: [
-
           BoxShadow(
-
             color: Colors.black.withOpacity(0.02),
-
             blurRadius: 10,
-
             offset: const Offset(0, 4),
-
           ),
-
         ],
-
       ),
-
       child: Row(
-
         crossAxisAlignment: CrossAxisAlignment.center,
-
         children: [
-
           Container(
-
             width: 38,
-
             height: 38,
-
             decoration: BoxDecoration(
-
               color: JuselColors.muted(context),
-
               borderRadius: BorderRadius.circular(10),
-
             ),
-
             child: Icon(
-
               Icons.receipt_long_outlined,
-
               color: JuselColors.primaryColor(context),
-
             ),
-
           ),
-
           const SizedBox(width: JuselSpacing.s12),
-
           Expanded(
-
             child: Column(
-
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
-
                 Row(
-
                   children: [
-
                     Expanded(
-
                       child: Text(
-
                         'Saved Sale',
-
                         style: JuselTextStyles.bodyMedium(context).copyWith(
-
                           fontWeight: FontWeight.w700,
-
                           color: JuselColors.foreground(context),
-
                           fontSize: 18,
-
                         ),
-
                       ),
-
                     ),
-
                     TextButton(
-
-                      onPressed: () {
-                        onNavigateToTab(2); // Navigate to Sales tab
-                      },
-
+                      onPressed: () => onNavigateToTab(2),
                       style: TextButton.styleFrom(
-
                         minimumSize: Size.zero,
-
                         padding: EdgeInsets.zero,
-
                       ),
-
                       child: Row(
-
                         mainAxisSize: MainAxisSize.min,
-
                         children: [
-
                           Text(
-
                             'Resume',
-
                             style: TextStyle(
-
                               color: JuselColors.primaryColor(context),
-
                               fontWeight: FontWeight.w800,
-
                               fontSize: 18,
-
                             ),
-
                           ),
-
-                          SizedBox(width: 4),
-
+                          const SizedBox(width: 4),
                           Icon(
-
                             Icons.chevron_right,
-
                             size: 18,
-
                             color: JuselColors.primaryColor(context),
-
                           ),
-
                         ],
-
                       ),
-
                     ),
-
                   ],
-
                 ),
-
-
-
                 Text(
-
-                  '3 items - 15 mins ago',
-
+                  '$totalItems item${totalItems == 1 ? '' : 's'} in progress',
                   style: JuselTextStyles.bodySmall(context).copyWith(
-
                     color: JuselColors.mutedForeground(context),
-
                     fontWeight: FontWeight.w600,
-
                     fontSize: 14,
-
                   ),
-
                 ),
-
               ],
-
             ),
-
           ),
-
         ],
-
       ),
-
     );
-
   }
-
 }
 
 

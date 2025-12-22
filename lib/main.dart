@@ -10,10 +10,16 @@ import 'package:jusel_app/firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // MUST come first
 
-  await Firebase.initializeApp(
-    // MUST run before runApp
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      // MUST run before runApp
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Log error but don't crash - app can still work offline
+    print('Firebase initialization error: $e');
+    // Continue anyway - Firebase will retry when needed
+  }
 
   runApp(const ProviderScope(child: MainApp())); // App starts AFTER Firebase
 }

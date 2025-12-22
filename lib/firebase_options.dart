@@ -54,7 +54,7 @@ class DefaultFirebaseOptions {
     appId: '1:539363332054:android:41d8f39850c4fac43d5e77',
     messagingSenderId: '539363332054',
     projectId: 'jusel-app',
-    storageBucket: 'jusel-app.firebasestorage.app',
+    storageBucket: 'jusel-app.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:539363332054:ios:db35e2da96081c013d5e77',
     messagingSenderId: '539363332054',
     projectId: 'jusel-app',
-    storageBucket: 'jusel-app.firebasestorage.app',
+    storageBucket: 'jusel-app.appspot.com',
     iosBundleId: 'com.example.juselApp',
   );
 }

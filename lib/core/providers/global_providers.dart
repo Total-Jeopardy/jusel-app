@@ -29,10 +29,59 @@ final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
 });
 
 class ThemeNotifier extends StateNotifier<ThemeState> {
-  ThemeNotifier() : super(ThemeState(mode: AppThemeMode.system));
+  ThemeNotifier() : super(ThemeState(mode: AppThemeMode.system)) {
+    _loadThemePreference();
+  }
 
-  void setThemeMode(AppThemeMode mode) {
+  Future<void> _loadThemePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedMode = prefs.getString('theme_mode');
+      if (savedMode != null) {
+        final mode = _parseThemeMode(savedMode);
+        if (mode != null) {
+          state = ThemeState(mode: mode);
+        }
+      }
+    } catch (e) {
+      // If loading fails, keep default (system)
+      print('Failed to load theme preference: $e');
+    }
+  }
+
+  AppThemeMode? _parseThemeMode(String value) {
+    switch (value) {
+      case 'light':
+        return AppThemeMode.light;
+      case 'dark':
+        return AppThemeMode.dark;
+      case 'system':
+        return AppThemeMode.system;
+      default:
+        return null;
+    }
+  }
+
+  String _themeModeToString(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return 'light';
+      case AppThemeMode.dark:
+        return 'dark';
+      case AppThemeMode.system:
+        return 'system';
+    }
+  }
+
+  Future<void> setThemeMode(AppThemeMode mode) async {
     state = state.copyWith(mode: mode);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('theme_mode', _themeModeToString(mode));
+    } catch (e) {
+      print('Failed to save theme preference: $e');
+      // Continue anyway - theme is still updated in memory
+    }
   }
 }
 

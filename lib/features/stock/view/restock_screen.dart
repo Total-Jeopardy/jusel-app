@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/database/app_database.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/ui/components/profile_avatar.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
@@ -131,14 +132,15 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                   MaterialPageRoute(builder: (_) => const AccountScreen()),
                 );
               },
-              child: CircleAvatar(
-                radius: 20,
-                backgroundColor: JuselColors.muted(context),
-                child: Icon(
-                  Icons.person,
-                  size: 20,
-                  color: JuselColors.mutedForeground(context),
-                ),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final user = ref.watch(authViewModelProvider).valueOrNull;
+                  return ProfileAvatar(
+                    radius: 20,
+                    userId: user?.uid,
+                    userName: user?.name,
+                  );
+                },
               ),
             ),
           ),
@@ -942,6 +944,7 @@ class _ProductPickerItem extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(JuselSpacing.s16),
             decoration: BoxDecoration(

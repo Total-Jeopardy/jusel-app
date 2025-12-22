@@ -42,7 +42,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +87,10 @@ class AppDatabase extends _$AppDatabase {
             await (m.database as dynamic).customStatement(
               "UPDATE stock_movements_table SET payment_method = 'cash' WHERE type = 'sale' AND payment_method IS NULL;",
             );
+          }
+
+          if (from < 5) {
+            await m.addColumn(usersTable, usersTable.bossId);
           }
 
           // Ensure all tables exist (in case new tables are added later)

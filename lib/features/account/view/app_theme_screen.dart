@@ -1,25 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
 enum _ThemeOption { light, dark, system }
 
-class AppThemeScreen extends StatefulWidget {
+class AppThemeScreen extends ConsumerStatefulWidget {
   const AppThemeScreen({super.key});
 
   @override
-  State<AppThemeScreen> createState() => _AppThemeScreenState();
+  ConsumerState<AppThemeScreen> createState() => _AppThemeScreenState();
 }
 
-class _AppThemeScreenState extends State<AppThemeScreen> {
-  _ThemeOption _selected = _ThemeOption.light;
+class _AppThemeScreenState extends ConsumerState<AppThemeScreen> {
+  _ThemeOption _getSelectedOption(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return _ThemeOption.light;
+      case AppThemeMode.dark:
+        return _ThemeOption.dark;
+      case AppThemeMode.system:
+        return _ThemeOption.system;
+    }
+  }
+
+  AppThemeMode _getThemeMode(_ThemeOption option) {
+    switch (option) {
+      case _ThemeOption.light:
+        return AppThemeMode.light;
+      case _ThemeOption.dark:
+        return AppThemeMode.dark;
+      case _ThemeOption.system:
+        return AppThemeMode.system;
+    }
+  }
 
   void _select(_ThemeOption option) {
-    setState(() => _selected = option);
+    final themeMode = _getThemeMode(option);
+    ref.read(themeProvider.notifier).setThemeMode(themeMode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeState = ref.watch(themeProvider);
+    final selected = _getSelectedOption(themeState.mode);
+    
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -55,14 +81,14 @@ class _AppThemeScreenState extends State<AppThemeScreen> {
                       children: [
                         _ThemePreviewCard(
                           label: 'Light',
-                          selected: _selected == _ThemeOption.light,
+                          selected: selected == _ThemeOption.light,
                           onTap: () => _select(_ThemeOption.light),
                           isDark: false,
                         ),
                         const SizedBox(width: JuselSpacing.s12),
                         _ThemePreviewCard(
                           label: 'Dark',
-                          selected: _selected == _ThemeOption.dark,
+                          selected: selected == _ThemeOption.dark,
                           onTap: () => _select(_ThemeOption.dark),
                           isDark: true,
                         ),
@@ -75,19 +101,19 @@ class _AppThemeScreenState extends State<AppThemeScreen> {
                         _ThemeOptionTile(
                           icon: Icons.wb_sunny_outlined,
                           label: 'Light',
-                          selected: _selected == _ThemeOption.light,
+                          selected: selected == _ThemeOption.light,
                           onTap: () => _select(_ThemeOption.light),
                         ),
                         _ThemeOptionTile(
                           icon: Icons.nightlight_outlined,
                           label: 'Dark',
-                          selected: _selected == _ThemeOption.dark,
+                          selected: selected == _ThemeOption.dark,
                           onTap: () => _select(_ThemeOption.dark),
                         ),
                         _ThemeOptionTile(
                           icon: Icons.smartphone_outlined,
                           label: 'System Default',
-                          selected: _selected == _ThemeOption.system,
+                          selected: selected == _ThemeOption.system,
                           onTap: () => _select(_ThemeOption.system),
                         ),
                       ],

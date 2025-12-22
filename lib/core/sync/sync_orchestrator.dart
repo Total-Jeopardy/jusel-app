@@ -23,9 +23,16 @@ class SyncOrchestrator {
   /// Check if device is online
   Future<bool> isOnline() async {
     try {
-      await firestore.collection('users').limit(1).get();
+      await firestore
+          .collection('products')
+          .limit(1)
+          .get(const GetOptions(source: Source.server));
       return true;
-    } catch (e) {
+    } on FirebaseException catch (e) {
+      // If we got a permission error, treat as online to avoid blocking sync.
+      if (e.code == 'permission-denied') return true;
+      return false;
+    } catch (_) {
       return false;
     }
   }
@@ -303,7 +310,7 @@ class SyncOrchestrator {
       // Products - Pull ALL products (not filtered by userId) so all devices see all shop data
       final productsSnap = await firestore
           .collection('products')
-          .get();
+          .get(const GetOptions(source: Source.server));
       
       print('[SyncOrchestrator] Pulling ${productsSnap.docs.length} products from Firestore');
 
@@ -354,7 +361,7 @@ class SyncOrchestrator {
       // Sales -> stock movements (type: sale) - Pull ALL sales
       final salesSnap = await firestore
           .collection('sales')
-          .get();
+          .get(const GetOptions(source: Source.server));
       
       print('[SyncOrchestrator] Pulling ${salesSnap.docs.length} sales from Firestore');
       await db.transaction(() async {
@@ -405,7 +412,7 @@ class SyncOrchestrator {
       // Restocks -> stock movements (type: stock_in) - Pull ALL restocks
       final restocksSnap = await firestore
           .collection('restocks')
-          .get();
+          .get(const GetOptions(source: Source.server));
       
       print('[SyncOrchestrator] Pulling ${restocksSnap.docs.length} restocks from Firestore');
       await db.transaction(() async {
@@ -456,7 +463,7 @@ class SyncOrchestrator {
       // Production batches -> stock movements (type: production_output) - Pull ALL batches
       final productionSnap = await firestore
           .collection('production_batches')
-          .get();
+          .get(const GetOptions(source: Source.server));
       
       print('[SyncOrchestrator] Pulling ${productionSnap.docs.length} production batches from Firestore');
       await db.transaction(() async {

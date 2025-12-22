@@ -1,17 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
-class LowStockThresholdScreen extends StatefulWidget {
+class LowStockThresholdScreen extends ConsumerStatefulWidget {
   const LowStockThresholdScreen({super.key});
 
   @override
-  State<LowStockThresholdScreen> createState() =>
+  ConsumerState<LowStockThresholdScreen> createState() =>
       _LowStockThresholdScreenState();
 }
 
-class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
+class _LowStockThresholdScreenState extends ConsumerState<LowStockThresholdScreen> {
   int _threshold = 10;
+  bool _isLoading = false;
+  bool _isSaving = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadThreshold();
+  }
+  
+  Future<void> _loadThreshold() async {
+    setState(() => _isLoading = true);
+    try {
+      final settingsService = await ref.read(settingsServiceProvider.future);
+      final threshold = await settingsService.getLowStockThreshold();
+      if (mounted) {
+        setState(() {
+          _threshold = threshold;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  Future<void> _saveThreshold() async {
+    if (_isSaving) return;
+    
+    setState(() => _isSaving = true);
+    try {
+      final settingsService = await ref.read(settingsServiceProvider.future);
+      await settingsService.setLowStockThreshold(_threshold);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Low stock threshold saved successfully'),
+            backgroundColor: JuselColors.successColor(context),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save threshold: $e'),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
 
   void _increment() {
     setState(() => _threshold += 1);
@@ -48,19 +111,21 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
               horizontalPadding,
               28,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  'Set the minimum quantity at which a product is considered low stock. This helps you restock in time.',
-                  textAlign: TextAlign.center,
-                  style: JuselTextStyles.bodyMedium(context).copyWith(
-                    color: JuselColors.mutedForeground(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: JuselSpacing.s16),
-                Container(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Set the minimum quantity at which a product is considered low stock. This helps you restock in time.',
+                        textAlign: TextAlign.center,
+                        style: JuselTextStyles.bodyMedium(context).copyWith(
+                          color: JuselColors.mutedForeground(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: JuselSpacing.s16),
+                      Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
                     horizontal: JuselSpacing.s16,
@@ -158,7 +223,7 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: (_isLoading || _isSaving) ? null : _saveThreshold,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         vertical: JuselSpacing.s12,
@@ -169,17 +234,28 @@ class _LowStockThresholdScreenState extends State<LowStockThresholdScreen> {
                       backgroundColor: JuselColors.primaryColor(context),
                       foregroundColor: JuselColors.primaryForeground,
                     ),
-                    child: const Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
+                    child: _isLoading || _isSaving
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                JuselColors.primaryForeground,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Save Changes',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
                   ),
                 ),
-              ],
-            ),
+                    ],
+                  ),
           );
         },
       ),

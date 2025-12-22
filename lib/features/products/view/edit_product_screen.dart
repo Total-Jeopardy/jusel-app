@@ -226,14 +226,29 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
       // Upload image if new one is selected
       String? finalImageUrl = _imageUrl;
       if (_selectedImage != null) {
-        finalImageUrl = await _imageUploadService.uploadProductImage(
-          file: _selectedImage!,
-          productId: widget.productId,
-        );
-        setState(() {
-          _imageUrl = finalImageUrl;
-          _selectedImage = null;
-        });
+        setState(() => _isUploadingImage = true);
+        try {
+          finalImageUrl = await _imageUploadService.uploadProductImage(
+            file: _selectedImage!,
+            productId: widget.productId,
+          );
+          setState(() {
+            _imageUrl = finalImageUrl;
+            _selectedImage = null;
+            _isUploadingImage = false;
+          });
+        } catch (e) {
+          setState(() => _isUploadingImage = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload image: $e'),
+                backgroundColor: JuselColors.destructiveColor(context),
+              ),
+            );
+          }
+          return; // Don't proceed with save if image upload fails
+        }
       }
 
       // Get original product for comparison
@@ -356,12 +371,7 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
         // Trigger refresh in products list
         ref.read(productsRefreshTriggerProvider.notifier).refresh();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Product updated successfully!'),
-            backgroundColor: JuselColors.successColor(context),
-          ),
-        );
+        _showSuccessSnackBar('Product updated successfully');
         Navigator.of(context).pop(true); // Return true to indicate success
       }
     } catch (e) {
@@ -378,6 +388,23 @@ class _EditProductScreenState extends ConsumerState<EditProductScreen> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: JuselTextStyles.bodyMedium(context).copyWith(
+            color: JuselColors.background(context),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: JuselColors.successColor(context),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override

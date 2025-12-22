@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/ui/components/profile_avatar.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/ui/components/quick_action_card.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_provider.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
+import 'package:jusel_app/features/dashboard/providers/period_filter_provider.dart';
 import 'package:jusel_app/features/production/view/batch_screen.dart';
 import 'package:jusel_app/features/products/view/products_screen.dart';
 import 'package:jusel_app/features/reports/view/reports_screen.dart';
@@ -160,11 +163,14 @@ class _LowStockItem {
 // Define _Header, _QuickActions, _OverviewGrid, _AlertsCard, _TrendCard, _TopProductsCard,
 // and PlaceholderScreen with simple layouts, using JuselTextStyles and JuselCard.
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authViewModelProvider).valueOrNull;
+    final name = user?.name ?? 'Boss';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -181,7 +187,7 @@ class _Header extends StatelessWidget {
                 ),
               ),
               Text(
-                'Welcome back, Boss',
+                'Welcome back, $name',
                 style: JuselTextStyles.bodyMedium(context).copyWith(
                   fontSize: 18,
                   color: JuselColors.mutedForeground(context),
@@ -218,14 +224,10 @@ class _Header extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const AccountScreen()),
                 );
               },
-              child: CircleAvatar(
+              child: ProfileAvatar(
                 radius: 25,
-                backgroundColor: JuselColors.muted(context),
-                child: Icon(
-                  Icons.person,
-                  size: 25,
-                  color: JuselColors.mutedForeground(context),
-                ),
+                userId: user?.uid,
+                userName: name,
               ),
             ),
           ],
@@ -329,13 +331,23 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-class _OverviewGrid extends StatelessWidget {
+class _OverviewGrid extends ConsumerWidget {
   final DashboardMetrics metrics;
   const _OverviewGrid({required this.metrics});
 
   @override
-  Widget build(BuildContext context) {
-    final periodOptions = ['Today', 'This week', 'This month', 'This quarter'];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final periodFilterState = ref.watch(periodFilterProvider);
+    final currentFilter = periodFilterState.filter;
+    
+    // Map PeriodFilter enum to display strings
+    final periodOptions = [
+      PeriodFilter.today,
+      PeriodFilter.thisWeek,
+      PeriodFilter.thisMonth,
+      PeriodFilter.thisQuarter,
+    ];
+    
     final cards = [
       _OverviewItem(
         title: 'Sales',
@@ -409,18 +421,20 @@ class _OverviewGrid extends StatelessWidget {
               ).copyWith(fontWeight: FontWeight.w700),
             ),
             DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: periodOptions.first,
+              child: DropdownButton<PeriodFilter>(
+                value: periodOptions.contains(currentFilter) 
+                    ? currentFilter 
+                    : PeriodFilter.today,
                 icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: JuselColors.primaryColor(context),
                 ),
                 items: periodOptions
                     .map(
-                      (p) => DropdownMenuItem(
-                        value: p,
+                      (filter) => DropdownMenuItem(
+                        value: filter,
                         child: Text(
-                          p,
+                          _getPeriodDisplayName(filter),
                           style: JuselTextStyles.bodyMedium(context).copyWith(
                             color: JuselColors.primaryColor(context),
                             fontWeight: FontWeight.w600,
@@ -429,7 +443,11 @@ class _OverviewGrid extends StatelessWidget {
                       ),
                     )
                     .toList(),
-                onChanged: (_) {},
+                onChanged: (PeriodFilter? newFilter) {
+                  if (newFilter != null) {
+                    ref.read(periodFilterProvider.notifier).setFilter(newFilter);
+                  }
+                },
               ),
             ),
           ],
@@ -457,6 +475,21 @@ class _OverviewGrid extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _getPeriodDisplayName(PeriodFilter filter) {
+    switch (filter) {
+      case PeriodFilter.today:
+        return 'Today';
+      case PeriodFilter.thisWeek:
+        return 'This week';
+      case PeriodFilter.thisMonth:
+        return 'This month';
+      case PeriodFilter.thisQuarter:
+        return 'This quarter';
+      default:
+        return 'Today';
+    }
   }
 }
 

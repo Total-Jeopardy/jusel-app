@@ -38,7 +38,8 @@ final dashboardProvider = FutureProvider<DashboardMetrics>((ref) async {
   final inventoryService = InventoryService(db);
   final pendingDao = ref.watch(pendingSyncQueueDaoProvider);
 
-  // Get date range from period filter state
+  // Watch period filter state so dashboard refreshes when filter changes
+  ref.watch(periodFilterProvider);
   final filterNotifier = ref.read(periodFilterProvider.notifier);
   final dateRange = filterNotifier.getDateRange();
 

@@ -356,23 +356,53 @@ class _ShopSettingsScreenState extends ConsumerState<ShopSettingsScreen> {
   }
 }
 
-class _ShopLogo extends StatelessWidget {
+class _ShopLogo extends ConsumerWidget {
   const _ShopLogo();
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<String?>(
+      future: ref.read(settingsServiceProvider.future).then((s) => s.getShopLogoUrl()),
+      builder: (context, snapshot) {
+        final logoUrl = snapshot.data;
+        final hasLogo = logoUrl != null && logoUrl.isNotEmpty;
+        
+        return Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: JuselColors.muted(context),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: hasLogo
+              ? ClipOval(
+                  child: Image.network(
+                    logoUrl,
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _PlaceholderShopLogo(context),
+                  ),
+                )
+              : _PlaceholderShopLogo(context),
+        );
+      },
+    );
+  }
+}
+
+class _PlaceholderShopLogo extends StatelessWidget {
+  final BuildContext context;
+  
+  const _PlaceholderShopLogo(this.context);
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 96,
-      height: 96,
-      decoration: BoxDecoration(
-        color: JuselColors.muted(context),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: const CircleAvatar(
-        radius: 46,
-        backgroundImage: AssetImage('assets/avatar_placeholder.png'),
-      ),
+    return Icon(
+      Icons.store,
+      size: 48,
+      color: JuselColors.mutedForeground(context),
     );
   }
 }

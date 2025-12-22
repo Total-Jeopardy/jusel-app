@@ -23,6 +23,17 @@ class UsersDao extends DatabaseAccessor<AppDatabase> with _$UsersDaoMixin {
     return select(usersTable).get();
   }
 
+  Future<List<UsersTableData>> getApprenticesByBoss(String bossId) {
+    return (select(usersTable)..where((u) => u.bossId.equals(bossId))).get();
+  }
+
+  Future<UsersTableData?> getBossForApprentice(String apprenticeId) async {
+    final apprentice = await getUserById(apprenticeId);
+    final bossId = apprentice?.bossId;
+    if (bossId == null) return null;
+    return getUserById(bossId);
+  }
+
   Future<int> getUserCount() async {
     final countExp = usersTable.id.count();
     final row =

@@ -1,25 +1,98 @@
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:jusel_app/core/providers/database_provider.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/services/image_upload_service.dart';
+import 'package:jusel_app/core/services/permission_service.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
+import 'package:jusel_app/data/repositories/auth_repository.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _emailController;
+  
+  File? _selectedImage;
+  String? _profileImageUrl;
+  bool _isLoading = false;
+  bool _isUploadingImage = false;
+  
+  final ImagePicker _imagePicker = ImagePicker();
+  final ImageUploadService _imageUploadService = ImageUploadService(
+    folderOverride: 'jusel/users',
+  );
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Jane Boss');
-    _phoneController = TextEditingController(text: '+1 234 567 890');
-    _emailController = TextEditingController(text: 'jane@jusel.store');
+    _nameController = TextEditingController();
+    _phoneController = TextEditingController();
+    _emailController = TextEditingController();
+    _loadUserData();
+  }
+  
+  Future<void> _loadUserData() async {
+    final user = ref.read(authViewModelProvider).valueOrNull;
+    if (user == null) return;
+    
+    // Load profile image from settings
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    final imageUrl = await settingsService.getProfileImageUrl();
+    
+    setState(() {
+      _nameController.text = user.name;
+      _phoneController.text = user.phone;
+      _emailController.text = user.email;
+      _profileImageUrl = imageUrl;
+    });
+  }
+  
+  Future<void> _pickImage() async {
+    try {
+      final permissionService = ref.read(permissionServiceProvider);
+      final hasPermission = await permissionService.requestImagePermission(
+        context,
+        ImageSource.gallery,
+      );
+      
+      if (!hasPermission) return;
+      
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 800,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+          _profileImageUrl = null; // Clear old URL when new image is selected
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: $e'),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -28,6 +101,102 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+  
+  Future<void> _saveChanges() async {
+    if (_isLoading) return;
+    
+    final user = ref.read(authViewModelProvider).valueOrNull;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('You must be logged in to update your profile'),
+          backgroundColor: JuselColors.destructiveColor(context),
+        ),
+      );
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      String? finalImageUrl = _profileImageUrl;
+      
+      // Upload image if new one is selected
+      if (_selectedImage != null) {
+        setState(() => _isUploadingImage = true);
+        try {
+          finalImageUrl = await _imageUploadService.uploadUserProfileImage(
+            file: _selectedImage!,
+            userId: user.uid,
+          );
+          
+          // Save to settings
+          final settingsService = await ref.read(settingsServiceProvider.future);
+          await settingsService.setProfileImageUrl(finalImageUrl);
+          
+          setState(() {
+            _profileImageUrl = finalImageUrl;
+            _selectedImage = null;
+            _isUploadingImage = false;
+          });
+        } catch (e) {
+          setState(() => _isUploadingImage = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload image: $e'),
+                backgroundColor: JuselColors.destructiveColor(context),
+              ),
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+      
+      // Update profile in Firestore and local DB
+      final authRepo = AuthRepository(
+        auth: FirebaseAuth.instance,
+        firestore: FirebaseFirestore.instance,
+        usersDao: ref.read(appDatabaseProvider).usersDao,
+      );
+      
+      await authRepo.updateUserProfile(
+        uid: user.uid,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        profileImageUrl: finalImageUrl,
+      );
+      
+      // Update auth viewmodel to refresh user data
+      ref.invalidate(authViewModelProvider);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile updated successfully'),
+            backgroundColor: JuselColors.successColor(context),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $e'),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -60,10 +229,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(
                   children: [
-                    _ProfilePhoto(),
+                    _ProfilePhoto(
+                      imageUrl: _profileImageUrl,
+                      selectedImage: _selectedImage,
+                      isUploading: _isUploadingImage,
+                    ),
                     const SizedBox(height: JuselSpacing.s6),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: _isLoading ? null : _pickImage,
                       child: Text(
                         'Change Photo',
                         style: TextStyle(
@@ -83,7 +256,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: (_isLoading || _isUploadingImage) ? null : _saveChanges,
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             vertical: JuselSpacing.s12,
@@ -94,13 +267,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           backgroundColor: JuselColors.primaryColor(context),
                           foregroundColor: JuselColors.primaryForeground,
                         ),
-                        child: const Text(
-                          'Save Changes',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
+                        child: _isLoading || _isUploadingImage
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    JuselColors.primaryForeground,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: JuselSpacing.s16),
@@ -116,14 +300,58 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 }
 
 class _ProfilePhoto extends StatelessWidget {
+  final String? imageUrl;
+  final File? selectedImage;
+  final bool isUploading;
+
+  const _ProfilePhoto({
+    this.imageUrl,
+    this.selectedImage,
+    this.isUploading = false,
+  });
+
   @override
   Widget build(BuildContext context) {
+    Widget imageWidget;
+    
+    if (isUploading) {
+      imageWidget = Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(
+            JuselColors.primaryColor(context),
+          ),
+        ),
+      );
+    } else if (selectedImage != null) {
+      imageWidget = ClipOval(
+        child: Image.file(
+          selectedImage!,
+          fit: BoxFit.cover,
+          width: 170,
+          height: 170,
+        ),
+      );
+    } else if (imageUrl != null && imageUrl!.isNotEmpty) {
+      imageWidget = ClipOval(
+        child: Image.network(
+          imageUrl!,
+          fit: BoxFit.cover,
+          width: 170,
+          height: 170,
+          errorBuilder: (_, __, ___) => _PlaceholderAvatar(),
+        ),
+      );
+    } else {
+      imageWidget = _PlaceholderAvatar();
+    }
+    
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 85,
-          backgroundImage: AssetImage('assets/avatar_placeholder.png'),
+          backgroundColor: JuselColors.muted(context),
+          child: imageWidget,
         ),
         Positioned(
           bottom: 6,
@@ -148,6 +376,25 @@ class _ProfilePhoto extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PlaceholderAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 170,
+      height: 170,
+      decoration: BoxDecoration(
+        color: JuselColors.muted(context),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.person,
+        size: 80,
+        color: JuselColors.mutedForeground(context),
+      ),
     );
   }
 }
@@ -222,7 +469,7 @@ class _FormCard extends StatelessWidget {
                   color: JuselColors.primaryColor(context),
                 ),
               ),
-              hintText: 'Enter full name',
+              hintText: 'Enter phone number',
             ),
           ),
           const SizedBox(height: JuselSpacing.s16),
@@ -243,7 +490,9 @@ class _FormCard extends StatelessWidget {
                   color: JuselColors.primaryColor(context),
                 ),
               ),
-              hintText: 'Enter full name',
+              hintText: 'Email cannot be changed',
+              filled: true,
+              fillColor: JuselColors.muted(context).withOpacity(0.5),
             ),
           ),
           const SizedBox(height: JuselSpacing.s20),

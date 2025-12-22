@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jusel_app/core/providers/database_provider.dart';
 import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/ui/components/profile_avatar.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/core/utils/product_constants.dart';
 import 'package:jusel_app/features/account/view/account_screen.dart';
 import 'package:jusel_app/features/dashboard/providers/dashboard_tab_provider.dart';
-import 'package:jusel_app/features/products/view/product_detail_screen.dart';
 import 'package:jusel_app/features/products/view/add_product_screen.dart';
 import 'package:jusel_app/features/products/providers/products_provider.dart';
 import 'package:jusel_app/features/stock/view/stock_detail_screen.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
-  const ProductsScreen({super.key});
+  const ProductsScreen({super.key, this.showAddButton = true});
+
+  final bool showAddButton;
 
   @override
   ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
@@ -54,6 +57,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           isProduced: p.isProduced,
           price: p.currentSellingPrice,
           cost: p.currentCostPrice ?? 0,
+          imageUrl: p.imageUrl,
           status: status,
           statusCount: stock,
         );
@@ -78,6 +82,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authViewModelProvider);
+    final isApprentice = authState.valueOrNull?.role == 'apprentice';
     // Watch for refresh trigger
     final refreshTrigger = ref.watch(productsRefreshTriggerProvider);
     if (_lastRefreshTrigger != null &&
@@ -103,111 +109,114 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         }
       },
       child: Scaffold(
-      backgroundColor: JuselColors.background(context),
-      appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            ref.read(dashboardTabProvider.notifier).goToDashboard();
-          },
-        ),
-        title: const Text(
-          'Products',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        centerTitle: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: JuselSpacing.s12),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(25),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AccountScreen()),
-                );
-              },
-              child: CircleAvatar(
-                radius: 20,
-                backgroundColor: JuselColors.muted(context),
-                child: Icon(
-                  Icons.person,
-                  size: 20,
-                  color: JuselColors.mutedForeground(context),
+        backgroundColor: JuselColors.background(context),
+        appBar: AppBar(
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              ref.read(dashboardTabProvider.notifier).goToDashboard();
+            },
+          ),
+          title: const Text(
+            'Products',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          centerTitle: false,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: JuselSpacing.s12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(25),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AccountScreen()),
+                  );
+                },
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final user = ref.watch(authViewModelProvider).valueOrNull;
+                    return ProfileAvatar(
+                      radius: 20,
+                      userId: user?.uid,
+                      userName: user?.name,
+                    );
+                  },
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => const AddProductScreen()),
-          );
-          // Refresh products list if a product was successfully added
-          if (result == true) {
-            _loadProducts();
-          }
-        },
-        backgroundColor: JuselColors.primaryColor(context),
-        child: const Icon(Icons.add),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Divider(height: 1, color: JuselColors.border(context)),
-              const SizedBox(height: JuselSpacing.s16),
-              _SearchBar(
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
+          ],
+        ),
+        floatingActionButton: (!widget.showAddButton || isApprentice)
+            ? null
+            : FloatingActionButton(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(builder: (_) => const AddProductScreen()),
+                  );
+                  // Refresh products list if a product was successfully added
+                  if (result == true) {
+                    _loadProducts();
+                  }
+                },
+                backgroundColor: JuselColors.primaryColor(context),
+                child: const Icon(Icons.add),
               ),
-              const SizedBox(height: JuselSpacing.s12),
-              _FilterChips(
-                selected: _filter,
-                onSelected: (f) => setState(() => _filter = f),
-              ),
-              const SizedBox(height: JuselSpacing.s12),
-              if (_loading)
-                const Center(child: CircularProgressIndicator())
-              else if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.all(JuselSpacing.s12),
-                  child: Text(
-                    _error!,
-                    style: JuselTextStyles.bodyMedium(context).copyWith(
-                      color: JuselColors.destructiveColor(context),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                )
-              else if (filtered.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(JuselSpacing.s12),
-                  child: Text(
-                    'No products found.',
-                    style: JuselTextStyles.bodyMedium(context).copyWith(
-                      color: JuselColors.mutedForeground(context),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                )
-              else
-                ...filtered.map(
-                  (p) => Padding(
-                    padding: const EdgeInsets.only(bottom: JuselSpacing.s12),
-                    child: _ProductTile(product: p),
-                  ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Divider(height: 1, color: JuselColors.border(context)),
+                const SizedBox(height: JuselSpacing.s16),
+                _SearchBar(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
                 ),
-              const SizedBox(height: JuselSpacing.s20),
-            ],
+                const SizedBox(height: JuselSpacing.s12),
+                _FilterChips(
+                  selected: _filter,
+                  onSelected: (f) => setState(() => _filter = f),
+                ),
+                const SizedBox(height: JuselSpacing.s12),
+                if (_loading)
+                  const Center(child: CircularProgressIndicator())
+                else if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(JuselSpacing.s12),
+                    child: Text(
+                      _error!,
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
+                        color: JuselColors.destructiveColor(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(JuselSpacing.s12),
+                    child: Text(
+                      'No products found.',
+                      style: JuselTextStyles.bodyMedium(context).copyWith(
+                        color: JuselColors.mutedForeground(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else
+                  ...filtered.map(
+                    (p) => Padding(
+                      padding: const EdgeInsets.only(bottom: JuselSpacing.s12),
+                      child: _ProductTile(product: p),
+                    ),
+                  ),
+                const SizedBox(height: JuselSpacing.s20),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -339,7 +348,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? JuselColors.foreground(context) : JuselColors.card(context),
+          color: active
+              ? JuselColors.foreground(context)
+              : JuselColors.card(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active ? Colors.transparent : JuselColors.border(context),
@@ -348,7 +359,9 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: JuselTextStyles.bodySmall(context).copyWith(
-            color: active ? JuselColors.background(context) : JuselColors.mutedForeground(context),
+            color: active
+                ? JuselColors.background(context)
+                : JuselColors.mutedForeground(context),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -378,20 +391,11 @@ class _ProductTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          if (product.status == ProductStatus.low ||
-              product.status == ProductStatus.out) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => StockDetailScreen(productId: product.id),
-              ),
-            );
-          } else {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ProductDetailScreen(productId: product.id),
-              ),
-            );
-          }
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => StockDetailScreen(productId: product.id),
+            ),
+          );
         },
         child: Container(
           decoration: BoxDecoration(
@@ -402,7 +406,7 @@ class _ProductTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ProductThumb(name: product.name),
+              _ProductThumb(name: product.name, imageUrl: product.imageUrl),
               const SizedBox(width: JuselSpacing.s12),
               Expanded(
                 child: Column(
@@ -469,7 +473,11 @@ class _ProductTile extends StatelessWidget {
     );
   }
 
-  _StatusStyle _statusStyle(BuildContext context, ProductStatus status, int count) {
+  _StatusStyle _statusStyle(
+    BuildContext context,
+    ProductStatus status,
+    int count,
+  ) {
     switch (status) {
       case ProductStatus.good:
         return _StatusStyle(
@@ -495,25 +503,67 @@ class _ProductTile extends StatelessWidget {
 
 class _ProductThumb extends StatelessWidget {
   final String name;
+  final String? imageUrl;
 
-  const _ProductThumb({required this.name});
+  const _ProductThumb({required this.name, this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
+
+    final thumb = Container(
       width: 54,
       height: 54,
       decoration: BoxDecoration(
         color: JuselColors.muted(context),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Center(
-        child: Text(
-          name.characters.take(2).toString(),
-          style: JuselTextStyles.bodyMedium(context).copyWith(
-            fontWeight: FontWeight.w800,
-            color: JuselColors.foreground(context),
-          ),
+      clipBehavior: Clip.antiAlias,
+      child: hasImage
+          ? Image.network(
+              imageUrl!,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: CircularProgressIndicator(
+                    value: loadingProgress.expectedTotalBytes != null
+                        ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                        : null,
+                    strokeWidth: 2,
+                  ),
+                );
+              },
+              errorBuilder: (_, __, ___) => _Initials(name: name),
+            )
+          : _Initials(name: name),
+    );
+
+    return thumb;
+  }
+}
+
+class _Initials extends StatelessWidget {
+  final String name;
+
+  const _Initials({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    // Extract first 2 characters, handling edge cases
+    final initials = name.trim().isEmpty
+        ? '?'
+        : name.trim().length >= 2
+        ? name.trim().substring(0, 2).toUpperCase()
+        : name.trim().substring(0, 1).toUpperCase();
+
+    return Center(
+      child: Text(
+        initials,
+        style: JuselTextStyles.bodyMedium(context).copyWith(
+          fontWeight: FontWeight.w800,
+          color: JuselColors.foreground(context),
         ),
       ),
     );
@@ -541,10 +591,9 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: JuselTextStyles.bodySmall(context).copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
+        style: JuselTextStyles.bodySmall(
+          context,
+        ).copyWith(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -558,6 +607,7 @@ class _Product {
   final bool isProduced;
   final double price;
   final double cost;
+  final String? imageUrl;
   final ProductStatus status;
   final int statusCount;
 
@@ -569,6 +619,7 @@ class _Product {
     required this.isProduced,
     required this.price,
     required this.cost,
+    required this.imageUrl,
     required this.status,
     required this.statusCount,
   });

@@ -792,6 +792,7 @@ class _ProductPickerItem extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(JuselSpacing.s16),
             decoration: BoxDecoration(

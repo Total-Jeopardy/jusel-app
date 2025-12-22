@@ -6,6 +6,7 @@ class UsersTable extends Table {
   TextColumn get phone => text()();
   TextColumn get email => text()();
   TextColumn get role => text()(); // boss or apprentice
+  TextColumn get bossId => text().nullable()(); // null for boss accounts, boss UID for apprentices
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   DateTimeColumn get createdAt => dateTime()();

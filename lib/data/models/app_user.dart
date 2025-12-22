@@ -6,6 +6,7 @@ class AppUser {
   final String name;
   final String phone;
   final String role;
+  final String? bossId;
   final bool isActive;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -16,6 +17,7 @@ class AppUser {
     required this.phone,
     required this.name,
     required this.role,
+    this.bossId,
     required this.isActive,
     required this.createdAt,
     this.updatedAt,
@@ -28,6 +30,7 @@ class AppUser {
       'name': name,
       'phone': phone,
       'role': role,
+      'bossId': bossId,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt == null ? null : Timestamp.fromDate(updatedAt!),
@@ -41,6 +44,7 @@ class AppUser {
       name: json['name'] as String,
       phone: json['phone'] as String,
       role: json['role'] as String,
+      bossId: json['bossId'] as String?,
       isActive: json['isActive'] as bool,
       createdAt: (json['createdAt'] as Timestamp).toDate(),
       updatedAt: json['updatedAt'] == null

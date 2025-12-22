@@ -43,6 +43,8 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
         state = AsyncValue.data(user);
+        // Hydrate profile image from Firestore on app start
+        await _hydrateProfileImageFromFirestore(user.uid);
       }
     } catch (_) {
       // Ignore hydration errors; user will sign in again.
@@ -60,6 +62,9 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
         return;
       }
       state = AsyncValue.data(user);
+
+      // Hydrate profile image from Firestore to SettingsService
+      await _hydrateProfileImageFromFirestore(user.uid);
 
       // Ensure apprentices always have auto sync enabled
       if (user.role == 'apprentice') {
@@ -80,8 +85,37 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
       state = AsyncValue.error(e, st);
     }
   }
+  
+  /// Hydrates profile image URL from Firestore to SettingsService
+  Future<void> _hydrateProfileImageFromFirestore(String uid) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final doc = await firestore.collection('users').doc(uid).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data();
+      if (data == null) return;
+      
+      final profileImageUrl = data['profileImageUrl'] as String?;
+      if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+        final settingsService = await _ref.read(settingsServiceProvider.future);
+        await settingsService.setProfileImageUrl(profileImageUrl);
+      }
+    } catch (e) {
+      // Ignore errors - profile image is optional
+      print('Failed to hydrate profile image: $e');
+    }
+  }
 
   Future<void> signOut() async {
+    // Clear profile image from SettingsService before signing out
+    try {
+      final settingsService = await _ref.read(settingsServiceProvider.future);
+      await settingsService.setProfileImageUrl(null);
+    } catch (_) {
+      // Ignore errors - clearing is best effort
+    }
+    
     await _authRepository.signOut();
     state = const AsyncValue.data(null);
     // Cancel any pending background sync
@@ -157,7 +191,6 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
     required String phone,
     required String email,
     required String password,
-    required String role,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -166,7 +199,7 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
         phone: phone,
         email: email,
         password: password,
-        role: role,
+        role: 'boss',
         enforceFirstUser: true,
       );
       state = AsyncValue.data(user);
@@ -180,7 +213,6 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
     required String phone,
     required String email,
     required String password,
-    required String role,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -189,8 +221,38 @@ class AuthViewModel extends StateNotifier<AsyncValue<AppUser?>> {
         phone: phone,
         email: email,
         password: password,
-        role: role,
+        role: 'boss',
         enforceFirstUser: false,
+      );
+      state = AsyncValue.data(user);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> createApprentice({
+    required String name,
+    required String phone,
+    required String email,
+    required String password,
+  }) async {
+    final current = state.valueOrNull;
+    if (current == null || current.role != 'boss') {
+      state = AsyncValue.error(
+        'Only bosses can create apprentices',
+        StackTrace.current,
+      );
+      return;
+    }
+
+    state = const AsyncValue.loading();
+    try {
+      final user = await _authRepository.signUpApprentice(
+        name: name,
+        phone: phone,
+        email: email,
+        password: password,
+        bossId: current.uid,
       );
       state = AsyncValue.data(user);
     } catch (e, st) {

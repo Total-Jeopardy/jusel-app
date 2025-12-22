@@ -11,6 +11,7 @@ import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/auth/view/reset_password_screen.dart';
 import 'package:jusel_app/features/account/view/user_activity_screen.dart';
+import 'package:jusel_app/features/auth/viewmodel/auth_viewmodel.dart';
 
 final _usersProvider = FutureProvider.autoDispose<List<UsersTableData>>((
   ref,
@@ -32,6 +33,38 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(authViewModelProvider).valueOrNull;
+    final isBoss = currentUser?.role == 'boss';
+
+    if (!isBoss) {
+      return Scaffold(
+        appBar: AppBar(
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => safePop(context, fallbackRoute: '/apprentice-dashboard'),
+          ),
+          title: const Text(
+            'Manage Users',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(JuselSpacing.s16),
+            child: Text(
+              'Only bosses can manage apprentices.',
+              style: JuselTextStyles.bodyMedium(context).copyWith(
+                color: JuselColors.mutedForeground(context),
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final usersAsync = ref.watch(_usersProvider);
 
     return Scaffold(
@@ -69,7 +102,10 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
             }).toList();
             final apprentices = users.where((u) {
               final role = u.role.toLowerCase();
-              return !(role == 'boss' || role == 'management');
+              final bossMatch = u.bossId == null
+                  ? true // legacy entries without boss linkage
+                  : currentUser != null && u.bossId == currentUser.uid;
+              return !(role == 'boss' || role == 'management') && bossMatch;
             }).toList();
 
             return Stack(
@@ -154,7 +190,7 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
                             )
                           : const Icon(Icons.add),
                       label: Text(
-                        _creatingUser ? 'Adding…' : 'Add User',
+                        _creatingUser ? 'Adding…' : 'Add Apprentice',
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -236,6 +272,11 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
   }
 
   Future<void> _createUserWithoutSwitchingSession(_NewUserData data) async {
+    final currentUser = ref.read(authViewModelProvider).valueOrNull;
+    if (currentUser == null || currentUser.role != 'boss') {
+      throw Exception('Only bosses can add apprentices.');
+    }
+
     final primary = Firebase.app();
     FirebaseApp secondary;
     try {
@@ -264,7 +305,8 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
       'email': data.email,
       'name': data.name,
       'phone': data.phone,
-      'role': data.role,
+      'role': 'apprentice',
+      'bossId': currentUser.uid,
       'isActive': true,
       'createdAt': Timestamp.fromDate(now),
       'updatedAt': null,
@@ -277,7 +319,8 @@ class _ManageUsersScreenState extends ConsumerState<ManageUsersScreen> {
         name: data.name,
         phone: data.phone,
         email: data.email,
-        role: data.role,
+        role: 'apprentice',
+        bossId: Value(currentUser.uid),
         isActive: const Value(true),
         createdAt: now,
       ),
@@ -678,14 +721,12 @@ class _NewUserData {
   final String phone;
   final String email;
   final String password;
-  final String role;
 
   const _NewUserData({
     required this.name,
     required this.phone,
     required this.email,
     required this.password,
-    required this.role,
   });
 }
 
@@ -701,7 +742,6 @@ class _NewUserSheetState extends State<_NewUserSheet> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _role = 'apprentice';
 
   @override
   void dispose() {
@@ -744,7 +784,7 @@ class _NewUserSheetState extends State<_NewUserSheet> {
           ),
           const SizedBox(height: JuselSpacing.s12),
           Text(
-            'Add User',
+            'Add New Apprentice',
             style: JuselTextStyles.headlineSmall(
               context,
             ).copyWith(fontWeight: FontWeight.w700),
@@ -777,40 +817,6 @@ class _NewUserSheetState extends State<_NewUserSheet> {
             obscure: true,
           ),
           const SizedBox(height: JuselSpacing.s12),
-          Text(
-            'Role',
-            style: JuselTextStyles.bodySmall(context).copyWith(
-              fontWeight: FontWeight.w700,
-              color: JuselColors.mutedForeground(context),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: RadioListTile<String>(
-                  value: 'boss',
-                  groupValue: _role,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Boss'),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _role = value);
-                  },
-                ),
-              ),
-              Expanded(
-                child: RadioListTile<String>(
-                  value: 'apprentice',
-                  groupValue: _role,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Apprentice'),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _role = value);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: JuselSpacing.s12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -823,7 +829,6 @@ class _NewUserSheetState extends State<_NewUserSheet> {
                           phone: _phoneController.text.trim(),
                           email: _emailController.text.trim(),
                           password: _passwordController.text.trim(),
-                          role: _role,
                         ),
                       );
                     }
@@ -835,7 +840,7 @@ class _NewUserSheetState extends State<_NewUserSheet> {
                 ),
               ),
               child: const Text(
-                'Create User',
+                'Add Apprentice',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),

@@ -37,6 +37,7 @@ class AuthRepository {
           phone: localUser.phone,
           email: localUser.email,
           role: localUser.role,
+          bossId: localUser.bossId,
           isActive: localUser.isActive,
           createdAt: localUser.createdAt,
           updatedAt: localUser.updatedAt,
@@ -55,6 +56,7 @@ class AuthRepository {
           phone: Value(user.phone),
           email: Value(user.email),
           role: Value(user.role),
+          bossId: Value(user.bossId),
           isActive: Value(user.isActive),
           createdAt: Value(user.createdAt),
           updatedAt: user.updatedAt == null
@@ -82,6 +84,7 @@ class AuthRepository {
         phone: localUser.phone,
         email: localUser.email,
         role: localUser.role,
+        bossId: localUser.bossId,
         isActive: localUser.isActive,
         createdAt: localUser.createdAt,
         updatedAt: localUser.updatedAt,
@@ -98,6 +101,7 @@ class AuthRepository {
         phone: Value(user.phone),
         email: Value(user.email),
         role: Value(user.role),
+        bossId: Value(user.bossId),
         isActive: Value(user.isActive),
         createdAt: Value(user.createdAt),
         updatedAt:
@@ -129,6 +133,7 @@ class AuthRepository {
     required String email,
     required String password,
     required String role, // boss or apprentice
+    String? bossId,
     bool enforceFirstUser = false,
   }) async {
     if (enforceFirstUser) {
@@ -136,6 +141,13 @@ class AuthRepository {
       if (exists) {
         throw Exception('An account already exists. Please sign in instead.');
       }
+    }
+
+    if (bossId == null && role != 'boss') {
+      throw Exception('Only bosses can sign up directly.');
+    }
+    if (bossId != null && role != 'apprentice') {
+      throw Exception('Apprentices must be created by a boss.');
     }
 
     final cred = await auth.createUserWithEmailAndPassword(
@@ -155,6 +167,7 @@ class AuthRepository {
       name: name,
       phone: phone,
       role: role,
+      bossId: bossId,
       isActive: true,
       createdAt: now,
       updatedAt: null,
@@ -165,6 +178,7 @@ class AuthRepository {
       'name': name,
       'phone': phone,
       'role': role,
+      'bossId': bossId,
       'isActive': true,
       'createdAt': Timestamp.fromDate(now),
       'updatedAt': null,
@@ -177,12 +191,67 @@ class AuthRepository {
         phone: phone,
         email: email,
         role: role,
+        bossId: Value(bossId),
         isActive: const Value(true),
         createdAt: now,
       ),
     );
 
     return user;
+  }
+
+  Future<AppUser> signUpApprentice({
+    required String name,
+    required String phone,
+    required String email,
+    required String password,
+    required String bossId,
+  }) {
+    return signUpUser(
+      name: name,
+      phone: phone,
+      email: email,
+      password: password,
+      role: 'apprentice',
+      bossId: bossId,
+    );
+  }
+
+  /// Update user profile (name, phone, profileImageUrl)
+  Future<void> updateUserProfile({
+    required String uid,
+    String? name,
+    String? phone,
+    String? profileImageUrl,
+  }) async {
+    final now = DateTime.now();
+    final updateData = <String, dynamic>{
+      'updatedAt': Timestamp.fromDate(now),
+    };
+
+    if (name != null) updateData['name'] = name;
+    if (phone != null) updateData['phone'] = phone;
+    if (profileImageUrl != null) updateData['profileImageUrl'] = profileImageUrl;
+
+    // Update Firestore
+    await firestore.collection('users').doc(uid).update(updateData);
+
+    // Update local database
+    final existingUser = await usersDao.getUserById(uid);
+    if (existingUser != null) {
+      await usersDao.updateUser(
+        UsersTableCompanion(
+          id: Value(uid),
+          name: name != null ? Value(name) : Value(existingUser.name),
+          phone: phone != null ? Value(phone) : Value(existingUser.phone),
+          email: Value(existingUser.email),
+          role: Value(existingUser.role),
+          bossId: Value(existingUser.bossId),
+          isActive: Value(existingUser.isActive),
+          updatedAt: Value(now),
+        ),
+      );
+    }
   }
 
   /// Returns true if any user exists (Firestore preferred, local fallback).

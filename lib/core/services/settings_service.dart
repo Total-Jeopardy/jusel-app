@@ -14,6 +14,13 @@ class SettingsService {
   static const String _syncStatusAlertsKey = 'sync_status_alerts';
   static const String _priceChangeAlertsKey = 'price_change_alerts';
   static const String _lastSyncedAtKey = 'last_synced_at';
+  static const String _profileImageUrlKey = 'profile_image_url';
+  
+  // Notification preferences keys
+  static const String _allowAllNotificationsKey = 'allow_all_notifications';
+  static const String _dailySummaryKey = 'daily_summary';
+  static const String _vibrationKey = 'vibration';
+  static const String _marketingKey = 'marketing';
 
   // Low Stock Threshold
   Future<int> getLowStockThreshold() async {
@@ -88,6 +95,52 @@ class SettingsService {
 
   Future<void> setLastSyncedAt(DateTime dateTime) async {
     await _prefs.setInt(_lastSyncedAtKey, dateTime.millisecondsSinceEpoch);
+  }
+
+  // Profile Image URL
+  Future<String?> getProfileImageUrl() async {
+    return _prefs.getString(_profileImageUrlKey);
+  }
+
+  Future<void> setProfileImageUrl(String? url) async {
+    if (url == null) {
+      await _prefs.remove(_profileImageUrlKey);
+    } else {
+      await _prefs.setString(_profileImageUrlKey, url);
+    }
+  }
+
+  // Additional notification preferences
+  Future<bool> getAllowAllNotifications() async {
+    return _prefs.getBool(_allowAllNotificationsKey) ?? true;
+  }
+
+  Future<void> setAllowAllNotifications(bool enabled) async {
+    await _prefs.setBool(_allowAllNotificationsKey, enabled);
+  }
+
+  Future<bool> getDailySummary() async {
+    return _prefs.getBool(_dailySummaryKey) ?? true;
+  }
+
+  Future<void> setDailySummary(bool enabled) async {
+    await _prefs.setBool(_dailySummaryKey, enabled);
+  }
+
+  Future<bool> getVibration() async {
+    return _prefs.getBool(_vibrationKey) ?? true;
+  }
+
+  Future<void> setVibration(bool enabled) async {
+    await _prefs.setBool(_vibrationKey, enabled);
+  }
+
+  Future<bool> getMarketing() async {
+    return _prefs.getBool(_marketingKey) ?? false;
+  }
+
+  Future<void> setMarketing(bool enabled) async {
+    await _prefs.setBool(_marketingKey, enabled);
   }
 }
 

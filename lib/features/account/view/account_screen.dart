@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
+import 'package:jusel_app/core/ui/components/profile_avatar.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 import 'package:jusel_app/features/account/view/change_password_placeholder.dart';
@@ -29,6 +31,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authViewModelProvider).valueOrNull;
+    final isApprentice = user?.role == 'apprentice';
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -75,34 +78,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                   ],
                 ),
                 const SizedBox(height: JuselSpacing.s16),
-                _SectionList(
-                  title: 'Business',
-                  children: [
-                    const _Tile(
-                      icon: Icons.group_outlined,
-                      label: 'Manage Users',
-                      action: _TileAction.manageUsers,
-                    ),
-
-                    const _Tile(
-                      icon: Icons.store_mall_directory_outlined,
-                      label: 'Shop Settings',
-                      action: _TileAction.shopSettings,
-                    ),
-                    _Tile(
-                      icon: Icons.warning_amber_outlined,
-                      label: 'Low Stock Threshold',
-                      trailing: Text(
-                        '< 10 units',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: JuselColors.mutedForeground(context),
-                        ),
-                      ),
-                      action: _TileAction.lowStockThreshold,
-                    ),
-                  ],
-                ),
+                _BusinessSection(isApprentice: isApprentice),
                 const SizedBox(height: JuselSpacing.s12),
                 _SectionList(
                   title: 'App Settings',
@@ -218,13 +194,13 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHeader extends ConsumerWidget {
   final AppUser? user;
 
   const _ProfileHeader({required this.user});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final name = user?.name ?? 'User';
     final role = user?.role.toUpperCase() ?? 'USER';
     final phone = user?.phone ?? '';
@@ -232,10 +208,7 @@ class _ProfileHeader extends StatelessWidget {
 
     return Column(
       children: [
-        const CircleAvatar(
-          radius: 45,
-          backgroundImage: AssetImage('assets/avatar_placeholder.png'),
-        ),
+        ProfileAvatar(radius: 45, userId: user?.uid, userName: name),
         const SizedBox(height: JuselSpacing.s12),
         Text(
           name,
@@ -334,6 +307,53 @@ class _SectionList extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _BusinessSection extends StatelessWidget {
+  final bool isApprentice;
+  const _BusinessSection({required this.isApprentice});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <Widget>[];
+
+    if (!isApprentice) {
+      items.addAll(const [
+        _Tile(
+          icon: Icons.group_outlined,
+          label: 'Manage Users',
+          action: _TileAction.manageUsers,
+        ),
+      ]);
+    }
+
+    items.add(
+      const _Tile(
+        icon: Icons.store_mall_directory_outlined,
+        label: 'Shop Settings',
+        action: _TileAction.shopSettings,
+      ),
+    );
+
+    if (!isApprentice) {
+      items.add(
+        _Tile(
+          icon: Icons.warning_amber_outlined,
+          label: 'Low Stock Threshold',
+          trailing: Text(
+            '< 10 units',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: JuselColors.mutedForeground(context),
+            ),
+          ),
+          action: _TileAction.lowStockThreshold,
+        ),
+      );
+    }
+
+    return _SectionList(title: 'Business', children: items);
   }
 }
 
@@ -456,14 +476,33 @@ enum _TileAction {
   aboutJusel,
 }
 
-class _FooterButtons extends StatelessWidget {
+class _FooterButtons extends ConsumerWidget {
   final VoidCallback onLogout;
   final bool loggingOut;
 
   const _FooterButtons({required this.onLogout, required this.loggingOut});
 
+  String _formatLastSync(DateTime? lastSync) {
+    if (lastSync == null) return 'Never';
+
+    final now = DateTime.now();
+    final difference = now.difference(lastSync);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+    } else {
+      return '${lastSync.day}/${lastSync.month}/${lastSync.year}';
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         SizedBox(
@@ -523,12 +562,36 @@ class _FooterButtons extends StatelessWidget {
           ),
         ),
         const SizedBox(height: JuselSpacing.s12),
-        Text(
-          'Version 1.2.0 (Build 45)\nLast Synced: Just now',
-          textAlign: TextAlign.center,
-          style: JuselTextStyles.bodySmall(
-            context,
-          ).copyWith(color: JuselColors.mutedForeground(context)),
+        FutureBuilder(
+          future: ref.read(settingsServiceProvider.future),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Text(
+                'Version 0.1.0\nLast Synced: Loading...',
+                textAlign: TextAlign.center,
+                style: JuselTextStyles.bodySmall(
+                  context,
+                ).copyWith(color: JuselColors.mutedForeground(context)),
+              );
+            }
+
+            final settingsService = snapshot.data!;
+            return FutureBuilder<DateTime?>(
+              future: settingsService.getLastSyncedAt(),
+              builder: (context, syncSnapshot) {
+                final lastSync = syncSnapshot.data;
+                final syncText = _formatLastSync(lastSync);
+
+                return Text(
+                  'Version 0.1.0\nLast Synced: $syncText',
+                  textAlign: TextAlign.center,
+                  style: JuselTextStyles.bodySmall(
+                    context,
+                  ).copyWith(color: JuselColors.mutedForeground(context)),
+                );
+              },
+            );
+          },
         ),
         const SizedBox(height: JuselSpacing.s16),
       ],

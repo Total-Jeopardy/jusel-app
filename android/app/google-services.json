@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "539363332054",
     "project_id": "jusel-app",
-    "storage_bucket": "jusel-app.firebasestorage.app"
+    "storage_bucket": "jusel-app.appspot.com"
   },
   "client": [
     {

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jusel_app/core/providers/global_providers.dart';
 import 'package:jusel_app/core/utils/navigation_helper.dart';
 import 'package:jusel_app/core/utils/theme.dart';
 
-class NotificationsSettingsScreen extends StatefulWidget {
+class NotificationsSettingsScreen extends ConsumerStatefulWidget {
   const NotificationsSettingsScreen({super.key});
 
   @override
-  State<NotificationsSettingsScreen> createState() =>
+  ConsumerState<NotificationsSettingsScreen> createState() =>
       _NotificationsSettingsScreenState();
 }
 
 class _NotificationsSettingsScreenState
-    extends State<NotificationsSettingsScreen> {
+    extends ConsumerState<NotificationsSettingsScreen> {
   bool _allowAll = true;
   bool _lowStock = true;
   bool _newSales = false;
@@ -19,6 +21,141 @@ class _NotificationsSettingsScreenState
   bool _vibration = true;
   bool _syncStatus = true;
   bool _marketing = false;
+  bool _isLoading = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+  
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      final settingsService = await ref.read(settingsServiceProvider.future);
+      final allowAll = await settingsService.getAllowAllNotifications();
+      final lowStock = await settingsService.getLowStockAlerts();
+      final newSales = await settingsService.getNewSalesAlerts();
+      final dailySummary = await settingsService.getDailySummary();
+      final vibration = await settingsService.getVibration();
+      final syncStatus = await settingsService.getSyncStatusAlerts();
+      final marketing = await settingsService.getMarketing();
+      
+      if (mounted) {
+        setState(() {
+          _allowAll = allowAll;
+          _lowStock = lowStock;
+          _newSales = newSales;
+          _dailySummary = dailySummary;
+          _vibration = vibration;
+          _syncStatus = syncStatus;
+          _marketing = marketing;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+  
+  Future<void> _updateSetting<T>(
+    Future<void> Function(T) setter,
+    T value,
+  ) async {
+    try {
+      await setter(value);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update setting: $e'),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _handleAllowAllChanged(bool value) async {
+    setState(() => _allowAll = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setAllowAllNotifications, value);
+  }
+  
+  Future<void> _handleLowStockChanged(bool value) async {
+    setState(() => _lowStock = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setLowStockAlerts, value);
+  }
+  
+  Future<void> _handleNewSalesChanged(bool value) async {
+    setState(() => _newSales = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setNewSalesAlerts, value);
+  }
+  
+  Future<void> _handleDailySummaryChanged(bool value) async {
+    setState(() => _dailySummary = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setDailySummary, value);
+  }
+  
+  Future<void> _handleVibrationChanged(bool value) async {
+    setState(() => _vibration = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setVibration, value);
+  }
+  
+  Future<void> _handleSyncStatusChanged(bool value) async {
+    setState(() => _syncStatus = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setSyncStatusAlerts, value);
+  }
+  
+  Future<void> _handleMarketingChanged(bool value) async {
+    setState(() => _marketing = value);
+    final settingsService = await ref.read(settingsServiceProvider.future);
+    await _updateSetting(settingsService.setMarketing, value);
+  }
+  
+  Future<void> _sendTestNotification() async {
+    try {
+      // Show a local notification-like snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.notifications_active, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Test notification sent! Check your device notifications.',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: JuselColors.successColor(context),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send test notification: $e'),
+            backgroundColor: JuselColors.destructiveColor(context),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,18 +185,20 @@ class _NotificationsSettingsScreenState
                   horizontalPadding,
                   28,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _SystemStatusCard(
-                      title: 'Allowed on this device',
-                      subtitle: 'Notifications are enabled in system settings.',
-                    ),
-                    const SizedBox(height: JuselSpacing.s12),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _SystemStatusCard(
+                            title: 'Allowed on this device',
+                            subtitle: 'Notifications are enabled in system settings.',
+                          ),
+                          const SizedBox(height: JuselSpacing.s12),
                     _ToggleTile(
                       label: 'Allow All Notifications',
                       value: _allowAll,
-                      onChanged: (val) => setState(() => _allowAll = val),
+                      onChanged: _handleAllowAllChanged,
                     ),
                     const SizedBox(height: JuselSpacing.s12),
                     _Section(
@@ -70,7 +209,7 @@ class _NotificationsSettingsScreenState
                           description:
                               'Get notified when inventory drops below your set threshold.',
                           value: _lowStock,
-                          onChanged: (val) => setState(() => _lowStock = val),
+                          onChanged: _handleLowStockChanged,
                         ),
                         _ToggleTile(
                           label: 'New Sales Alerts',
@@ -78,15 +217,14 @@ class _NotificationsSettingsScreenState
                           description:
                               'Receive instant alerts for every new sale recorded.',
                           value: _newSales,
-                          onChanged: (val) => setState(() => _newSales = val),
+                          onChanged: _handleNewSalesChanged,
                         ),
                         _ToggleTile(
                           label: 'Daily Sales Summary',
                           description:
                               'Get a summary of the day\'s performance at closing time.',
                           value: _dailySummary,
-                          onChanged: (val) =>
-                              setState(() => _dailySummary = val),
+                          onChanged: _handleDailySummaryChanged,
                           footer: Row(
                             children: [
                               Icon(
@@ -114,7 +252,7 @@ class _NotificationsSettingsScreenState
                           label: 'Vibration',
                           description: 'Vibrate when alerts are received.',
                           value: _vibration,
-                          onChanged: (val) => setState(() => _vibration = val),
+                          onChanged: _handleVibrationChanged,
                         ),
                       ],
                     ),
@@ -126,7 +264,7 @@ class _NotificationsSettingsScreenState
                           description:
                               'Know when your data is successfully synced or if sync fails.',
                           value: _syncStatus,
-                          onChanged: (val) => setState(() => _syncStatus = val),
+                          onChanged: _handleSyncStatusChanged,
                         ),
                       ],
                     ),
@@ -138,14 +276,14 @@ class _NotificationsSettingsScreenState
                           description:
                               'Stay updated with new features, tips, and special offers.',
                           value: _marketing,
-                          onChanged: (val) => setState(() => _marketing = val),
+                          onChanged: _handleMarketingChanged,
                         ),
                       ],
                     ),
                     const SizedBox(height: JuselSpacing.s12),
                     Center(
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: _isLoading ? null : _sendTestNotification,
                         child: Text(
                           'Send Test Notification',
                           style: TextStyle(
@@ -155,8 +293,8 @@ class _NotificationsSettingsScreenState
                         ),
                       ),
                     ),
-                  ],
-                ),
+                        ],
+                      ),
               ),
             ),
           );

@@ -54,6 +54,15 @@ class $UsersTableTable extends UsersTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _bossIdMeta = const VerificationMeta('bossId');
+  @override
+  late final GeneratedColumn<String> bossId = GeneratedColumn<String>(
+    'boss_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -98,6 +107,7 @@ class $UsersTableTable extends UsersTable
     phone,
     email,
     role,
+    bossId,
     isActive,
     createdAt,
     updatedAt,
@@ -151,6 +161,12 @@ class $UsersTableTable extends UsersTable
     } else if (isInserting) {
       context.missing(_roleMeta);
     }
+    if (data.containsKey('boss_id')) {
+      context.handle(
+        _bossIdMeta,
+        bossId.isAcceptableOrUnknown(data['boss_id']!, _bossIdMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -200,6 +216,10 @@ class $UsersTableTable extends UsersTable
         DriftSqlType.string,
         data['${effectivePrefix}role'],
       )!,
+      bossId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}boss_id'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -227,6 +247,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
   final String phone;
   final String email;
   final String role;
+  final String? bossId;
   final bool isActive;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -236,6 +257,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
     required this.phone,
     required this.email,
     required this.role,
+    this.bossId,
     required this.isActive,
     required this.createdAt,
     this.updatedAt,
@@ -248,6 +270,9 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
     map['phone'] = Variable<String>(phone);
     map['email'] = Variable<String>(email);
     map['role'] = Variable<String>(role);
+    if (!nullToAbsent || bossId != null) {
+      map['boss_id'] = Variable<String>(bossId);
+    }
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || updatedAt != null) {
@@ -263,6 +288,9 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
       phone: Value(phone),
       email: Value(email),
       role: Value(role),
+      bossId: bossId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bossId),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: updatedAt == null && nullToAbsent
@@ -282,6 +310,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
       phone: serializer.fromJson<String>(json['phone']),
       email: serializer.fromJson<String>(json['email']),
       role: serializer.fromJson<String>(json['role']),
+      bossId: serializer.fromJson<String?>(json['bossId']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -296,6 +325,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
       'phone': serializer.toJson<String>(phone),
       'email': serializer.toJson<String>(email),
       'role': serializer.toJson<String>(role),
+      'bossId': serializer.toJson<String?>(bossId),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -308,6 +338,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
     String? phone,
     String? email,
     String? role,
+    Value<String?> bossId = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
     Value<DateTime?> updatedAt = const Value.absent(),
@@ -317,6 +348,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
     phone: phone ?? this.phone,
     email: email ?? this.email,
     role: role ?? this.role,
+    bossId: bossId.present ? bossId.value : this.bossId,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -328,6 +360,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
       phone: data.phone.present ? data.phone.value : this.phone,
       email: data.email.present ? data.email.value : this.email,
       role: data.role.present ? data.role.value : this.role,
+      bossId: data.bossId.present ? data.bossId.value : this.bossId,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -342,6 +375,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
           ..write('phone: $phone, ')
           ..write('email: $email, ')
           ..write('role: $role, ')
+          ..write('bossId: $bossId, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -350,8 +384,17 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, phone, email, role, isActive, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    phone,
+    email,
+    role,
+    bossId,
+    isActive,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -361,6 +404,7 @@ class UsersTableData extends DataClass implements Insertable<UsersTableData> {
           other.phone == this.phone &&
           other.email == this.email &&
           other.role == this.role &&
+          other.bossId == this.bossId &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -372,6 +416,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
   final Value<String> phone;
   final Value<String> email;
   final Value<String> role;
+  final Value<String?> bossId;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime?> updatedAt;
@@ -382,6 +427,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
     this.phone = const Value.absent(),
     this.email = const Value.absent(),
     this.role = const Value.absent(),
+    this.bossId = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -393,6 +439,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
     required String phone,
     required String email,
     required String role,
+    this.bossId = const Value.absent(),
     this.isActive = const Value.absent(),
     required DateTime createdAt,
     this.updatedAt = const Value.absent(),
@@ -409,6 +456,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
     Expression<String>? phone,
     Expression<String>? email,
     Expression<String>? role,
+    Expression<String>? bossId,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -420,6 +468,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
       if (phone != null) 'phone': phone,
       if (email != null) 'email': email,
       if (role != null) 'role': role,
+      if (bossId != null) 'boss_id': bossId,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -433,6 +482,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
     Value<String>? phone,
     Value<String>? email,
     Value<String>? role,
+    Value<String?>? bossId,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime?>? updatedAt,
@@ -444,6 +494,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       role: role ?? this.role,
+      bossId: bossId ?? this.bossId,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -469,6 +520,9 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
     if (role.present) {
       map['role'] = Variable<String>(role.value);
     }
+    if (bossId.present) {
+      map['boss_id'] = Variable<String>(bossId.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -492,6 +546,7 @@ class UsersTableCompanion extends UpdateCompanion<UsersTableData> {
           ..write('phone: $phone, ')
           ..write('email: $email, ')
           ..write('role: $role, ')
+          ..write('bossId: $bossId, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -4295,6 +4350,7 @@ typedef $$UsersTableTableCreateCompanionBuilder =
       required String phone,
       required String email,
       required String role,
+      Value<String?> bossId,
       Value<bool> isActive,
       required DateTime createdAt,
       Value<DateTime?> updatedAt,
@@ -4307,6 +4363,7 @@ typedef $$UsersTableTableUpdateCompanionBuilder =
       Value<String> phone,
       Value<String> email,
       Value<String> role,
+      Value<String?> bossId,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime?> updatedAt,
@@ -4344,6 +4401,11 @@ class $$UsersTableTableFilterComposer
 
   ColumnFilters<String> get role => $composableBuilder(
     column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bossId => $composableBuilder(
+    column: $table.bossId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4397,6 +4459,11 @@ class $$UsersTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get bossId => $composableBuilder(
+    column: $table.bossId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -4436,6 +4503,9 @@ class $$UsersTableTableAnnotationComposer
 
   GeneratedColumn<String> get role =>
       $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get bossId =>
+      $composableBuilder(column: $table.bossId, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -4483,6 +4553,7 @@ class $$UsersTableTableTableManager
                 Value<String> phone = const Value.absent(),
                 Value<String> email = const Value.absent(),
                 Value<String> role = const Value.absent(),
+                Value<String?> bossId = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -4493,6 +4564,7 @@ class $$UsersTableTableTableManager
                 phone: phone,
                 email: email,
                 role: role,
+                bossId: bossId,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -4505,6 +4577,7 @@ class $$UsersTableTableTableManager
                 required String phone,
                 required String email,
                 required String role,
+                Value<String?> bossId = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> updatedAt = const Value.absent(),
@@ -4515,6 +4588,7 @@ class $$UsersTableTableTableManager
                 phone: phone,
                 email: email,
                 role: role,
+                bossId: bossId,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

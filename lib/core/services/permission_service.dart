@@ -7,7 +7,7 @@ import 'package:jusel_app/core/utils/theme.dart';
 /// Service for handling permissions with user-friendly dialogs
 class PermissionService {
   /// Request permission for image source (camera or gallery)
-  /// Shows a dialog explaining why permission is needed before requesting
+  /// The system will automatically show the permission dialog on first use
   Future<bool> requestImagePermission(
     BuildContext context,
     ImageSource source,
@@ -18,19 +18,6 @@ class PermissionService {
         ? <Permission>[Permission.camera]
         // For gallery, try Photos (iOS/Android 13+) then Storage (older Android)
         : <Permission>[Permission.photos, Permission.storage];
-
-    final permissionName = isCamera ? 'Camera' : 'Photos/Storage';
-    final explanation = isCamera
-        ? 'Jusel needs access to your camera to take photos of products.'
-        : 'Jusel needs access to your photos to select product images.';
-
-    // Show explanation once before attempting requests
-    final shouldRequest = await _showPermissionRequestDialog(
-      context,
-      permissionName,
-      explanation,
-    );
-    if (!shouldRequest) return false;
 
     var permanentlyDenied = false;
 
@@ -46,6 +33,7 @@ class PermissionService {
         continue; // Try the next candidate (gallery flow)
       }
 
+      // Directly request permission - system will show native dialog
       final requestStatus = await permission.request();
 
       if (requestStatus.isGranted || requestStatus.isLimited) {
@@ -60,6 +48,11 @@ class PermissionService {
 
     // If we got here, nothing was granted
     if (permanentlyDenied) {
+      final permissionName = isCamera ? 'Camera' : 'Photos/Storage';
+      final explanation = isCamera
+          ? 'Jusel needs access to your camera to take photos of products.'
+          : 'Jusel needs access to your photos to select product images.';
+      
       final shouldOpen = await _showPermissionDeniedDialog(
         context,
         permissionName,
@@ -68,41 +61,9 @@ class PermissionService {
       if (shouldOpen) {
         await openAppSettings();
       }
-    } else {
-      _showRetrySnackBar(context, permissionName, source);
     }
 
     return false;
-  }
-
-  /// Show dialog explaining why permission is needed
-  Future<bool> _showPermissionRequestDialog(
-    BuildContext context,
-    String permissionName,
-    String explanation,
-  ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Allow $permissionName Access?'),
-            content: Text(explanation),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: JuselColors.primaryColor(context),
-                  foregroundColor: JuselColors.primaryForeground,
-                ),
-                child: const Text('Allow'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
   }
 
   /// Show dialog when permission is permanently denied
@@ -151,28 +112,6 @@ class PermissionService {
     }
   }
 
-  void _showRetrySnackBar(
-    BuildContext context,
-    String permissionName,
-    ImageSource source,
-  ) {
-    if (!context.mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$permissionName permission is required to continue.'),
-        backgroundColor: JuselColors.destructiveColor(context),
-        action: SnackBarAction(
-          label: 'Try Again',
-          textColor: JuselColors.primaryForeground,
-          onPressed: () async {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            await requestImagePermission(context, source);
-          },
-        ),
-      ),
-    );
-  }
 }
 
 /// Provider for PermissionService
